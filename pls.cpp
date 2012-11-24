@@ -163,44 +163,25 @@ int main() {
     //http://eigen.tuxfamily.org/dox/QuickRefPage.html
     Mat2D X  = read_matrix_file("nir.csv", ',');
     Mat2D Y  = read_matrix_file("octane.csv", ',');
-    int A = 1; 
+    Mat2Dc P, W, R, Q, beta;
 
-    Mat2Dc P = Mat2Dc::Zero(X.cols(), A); //P = zeros(size(X)(2),A);
-    Mat2Dc W = Mat2Dc::Zero(X.cols(), A); //W = zeros(size(X)(2),A);
-    Mat2Dc R = Mat2Dc::Zero(X.cols(), A); //R = zeros(size(X)(2),A);
-    Mat2Dc Q = Mat2Dc::Zero(Y.cols(), A);  //Q = zeros(size(Y)(2),A);
-    Mat2Dc beta;
-    
-    //cout << setprecision(16) << X << endl;
+    for (int A = 1; A<11; A++) { // number of components to try
+        //int A = 1; 
 
-    pls_algorithm2(X,Y,A, W,P,Q,R,beta);
-    
-    //cout << setprecision(6) << Y << endl;
-    cout << A << " components" << endl;
-    cout << setprecision(6) << (Y-X*beta.real()).cwiseProduct(Y-X*beta.real()).sum() << endl;
+        P.setZero(X.cols(), A); //P = zeros(size(X)(2),A);
+        W.setZero(X.cols(), A); //W = zeros(size(X)(2),A);
+        R.setZero(X.cols(), A); //R = zeros(size(X)(2),A);
+        Q.setZero(Y.cols(), A);  //Q = zeros(size(Y)(2),A);
 
-    A = 3; 
+        pls_algorithm2(X,Y,A, W,P,Q,R,beta);
 
-    P = Mat2Dc::Zero(X.cols(), A); //P = zeros(size(X)(2),A);
-    W = Mat2Dc::Zero(X.cols(), A); //W = zeros(size(X)(2),A);
-    R = Mat2Dc::Zero(X.cols(), A); //R = zeros(size(X)(2),A);
-    Q = Mat2Dc::Zero(Y.cols(), A);  //Q = zeros(size(Y)(2),A);
+        //cout << setprecision(16) << X << endl;
+        //cout << setprecision(6) << Y << endl;
 
-    pls_algorithm2(X,Y,A, W,P,Q,R,beta);
-    
-    cout << A << " components" << endl;
-    cout << setprecision(6) << (Y-X*beta.real()).cwiseProduct(Y-X*beta.real()).sum() << endl;
-
-    A = 10; 
-    P = Mat2Dc::Zero(X.cols(), A); //P = zeros(size(X)(2),A);
-    W = Mat2Dc::Zero(X.cols(), A); //W = zeros(size(X)(2),A);
-    R = Mat2Dc::Zero(X.cols(), A); //R = zeros(size(X)(2),A);
-    Q = Mat2Dc::Zero(Y.cols(), A);  //Q = zeros(size(Y)(2),A);
-
-    pls_algorithm2(X,Y,A, W,P,Q,R,beta);
-    
-    cout << A << " components" << endl;
-    cout << setprecision(6) << (Y-X*beta.real()).cwiseProduct(Y-X*beta.real()).sum() << endl;
+        cout << A << " components" << endl;
+        // How well did we do?
+        cout << setprecision(6) << (Y-X*beta.real()).cwiseProduct(Y-X*beta.real()).sum() << endl;
+    }
 
     return 0;
 }

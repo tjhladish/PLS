@@ -2,7 +2,7 @@
 #include <vector>
 #include <iostream>
 #include <fstream>
-//#include <mpreal.h>
+//#include "/home/tjhladish/work/lib/eigen/unsupported/test/mpreal/mpreal.h"
 #include <Eigen/Core>
 #include <Eigen/Eigenvalues>
 #include <unsupported/Eigen/MPRealSupport>
@@ -17,8 +17,26 @@ typedef long double float_type;
 //typedef mpreal float_type;
 typedef Matrix<float_type,Dynamic,Dynamic> Mat2D;
 typedef Matrix<float_type, Dynamic, 1>  Col;
+typedef Matrix<float_type, 1, Dynamic>  Row;
 typedef Matrix<complex<float_type>,Dynamic,Dynamic> Mat2Dc;
 typedef Matrix<complex<float_type>, Dynamic, 1>  Colc;
+
+typedef enum { KERNEL_TYPE1, KERNEL_TYPE2 } ALGORITHM;
+
+struct PLS_Model {
+    Mat2Dc P, W, R, Q, T, beta;
+    int A;
+    void initialize(int num_predictors, int num_responses, int num_components) {
+        A = num_components; 
+        P.setZero(num_predictors, num_components);
+        W.setZero(num_predictors, num_components);
+        R.setZero(num_predictors, num_components);
+        Q.setZero(num_responses, num_components);
+        // T will be initialized if needed
+        return;
+    }
+};
+
 //  Mat2D A(3,4); A  << 1,2,0,1, 1,1,1,-1, 3,1,5,-7;
 //  VectorXd b(3);   b << 7,3,1;
 //  VectorXd x;
@@ -74,9 +92,38 @@ Mat2D read_matrix_file(string filename, char sep) {
     return X;
 }
 
-   
-float_type dominant_eigenvalue( EigenSolver<Mat2D> es ){
-    Matrix<complex<float_type>, Dynamic, 1>  ev = es.eigenvalues();
+Row col_means( Mat2D mat ) {
+    
+    /*Row means = Row::zero(mat.cols());
+    const double N = mat.rows();
+    assert (N>0);
+
+    const double N_inv = 1.0/N;
+    for (int i=0; i<mat.cols(); i++) {
+        means[i] = mat->col(i).array().sum() * N_inv;
+    }*/
+    return mat.colwise().sum() / mat.rows();
+}
+
+
+Row col_stdev( Mat2D mat, Row means ) {
+    Row stdevs = Row::Zero(mat.cols());
+    const double N = mat.rows();
+    if ( N < 2 ) return stdevs;
+
+    const double N_    = 1.0/(N-1); // N-1 for unbiased sample variance
+    for (int i=0; i<mat.cols(); i++) {
+        //stdevs[i] = ( (mat.col(i).array()-means[i]).square().sum() * N_ ).sqrt();
+        stdevs[i] = sqrt( (mat.col(i).array()-means[i]).square().sum() * N_ );
+    }
+    //stdevs = (mat.col(i).array()-means[i]).square().sum() * N_ ).sqrt();
+    return stdevs;
+}
+
+
+float_type dominant_eigenvalue( EigenSolver<Mat2Dc> es ){
+    Colc  ev = es.eigenvalues();
+    //Matrix<complex<float_type>, Dynamic, 1>  ev = es.eigenvalues();
     float_type m = 0;
     for (int i = 0; i<ev.size(); i++) {
         if (imag(ev[i]) == 0) {
@@ -112,75 +159,106 @@ Colc dominant_eigenvector( EigenSolver<Mat2D> es ){
 
 
 //Modified kernel algorithm
-void pls_algorithm2(const Mat2D X, const Mat2D Y, int A, Mat2Dc& W, Mat2Dc& P, Mat2Dc& Q, Mat2Dc& R, Mat2Dc& beta) {
-    int M = Y.cols(); //columns in Y?
+void pls_algorithm2(const Mat2D X, const Mat2D Y, PLS_Model& plsm, ALGORITHM algorithm) {
+    int A = plsm.A; Mat2Dc& W = plsm.W; Mat2Dc& P = plsm.P; Mat2Dc& Q = plsm.Q; Mat2Dc& R = plsm.R; Mat2Dc& T = plsm.T; Mat2Dc& beta = plsm.beta;
 
-    //Modified kernel algorithm #2
+    int M = Y.cols(); // Number of response variables == columns in Y
+
+    if (algorithm == KERNEL_TYPE1) T.setZero(X.rows(), A);
+
     Mat2D XY = X.transpose() * Y;  // XY=X*Y;
-    Mat2D XX = X.transpose() * X;  // XX=X'*X;
+    Mat2D XX;
+    if (algorithm == KERNEL_TYPE2) XX = X.transpose() * X;  // XX=X'*X;
+    //Mat2Dc XY = (X.transpose() * Y).cast<complex<float_type> > ();  // XY=X*Y;
+    //Mat2Dc XX = (X.transpose() * X).cast<complex<float_type> > ();  // XX=X'*X;
 
     for (int i=0; i<A; i++) {
-        Colc w, p, q, r; 
+        Colc w, p, q, r, t; 
+        Mat2Dc tt;
         if (M==1) {
+            //w = XY;
             w = XY.cast<complex<float_type> >();
-            //w = XY.cast< complex<float_type> >();
         } else {
-            EigenSolver<Mat2D> es( XY.transpose() * XY );
-            //Mat2D C = es.eigenvectors();
-            //Mat2D D = es.eigenvalues();
-
-            //[C,D]=eig(XY'*XY);
+            EigenSolver<Mat2D> es( (XY.transpose() * XY) );
             q = dominant_eigenvector(es);//C(:,find(diag(D)==max(diag(D))));
             w = (XY*q);
         }
-        //complex<float_type> w2 = w.transpose()*w;
-        w /= sqrt((w.transpose()*w)(0,0));
-        //w=w.cwiseQuotient( (w.transpose()*w).cwiseSqrt() );
-        //w=w/sqrt(w'*w);
+
+        w /= sqrt((w.transpose()*w)(0,0)); // use normalize function from eigen?
         r=w;
-        for (int j=0; j<i-1; j++) {
-            r=r- (P.col(j).transpose()*w)(0,0)*R.col(j);
+        for (int j=0; j<=i-1; j++) {
+            r -= (P.col(j).transpose()*w)(0,0)*R.col(j);
         }
-        Mat2Dc tt = (r.transpose()*XX*r);
-        p= (r.transpose()*XX).transpose(); p /= tt(0,0);
-        //p= (r.transpose()*XX).transpose().cwiseQuotient(tt);
-        q= (r.transpose()*XY).transpose(); q /= tt(0,0);
-        //q= (r.transpose()*XY).transpose().cwiseQuotient(tt);
-        XY=XY-((p*q.transpose())*tt).real(); // is casting this to 'real' safe?
+        if (algorithm == KERNEL_TYPE1) {
+            t = X*r;
+            tt = t.transpose()*t;
+            p.noalias() = (X.transpose()*t);
+        } else if (algorithm == KERNEL_TYPE2) {
+            tt = r.transpose()*XX*r;
+            p.noalias() = (r.transpose()*XX).transpose();
+        }
+        p /= tt(0,0);
+        q.noalias() = (r.transpose()*XY).transpose(); q /= tt(0,0);
+        XY -= ((p*q.transpose())*tt).real(); // is casting this to 'real' always safe?
+        //cout << setprecision(6) << i << "	w="	<< w.sum().real()  << "	p="	<< p.sum().real() << "	q="	<< q.sum().real()  << "	r="	<<  r.sum().real()  << "\ttt=" << tt(0,0) <<  "\tXX" << XX.sum() << endl;
         W.col(i)=w;
         P.col(i)=p;
         Q.col(i)=q;
         R.col(i)=r;
+        if (algorithm == KERNEL_TYPE1) T.col(i) = t;
     }
 
-    beta=R*Q.transpose(); // compute the regression coefficients
+    beta.noalias() = R*Q.transpose(); // compute the regression coefficients
+    //cout << beta << endl;
+    //cout << T * Q.transpose() << endl;
+    //beta = beta.cwiseProduct(Ystdev.transpose()).cwiseQuotient(Xstdev.transpose());
+    //cout << beta.size() << endl;
+    //cout << Xstdev.size() << endl;
+    //cout << Ystdev.size() << endl;
     return; 
 }
 
 
-
 int main() { 
     //http://eigen.tuxfamily.org/dox/QuickRefPage.html
-    Mat2D X  = read_matrix_file("nir.csv", ',');
-    Mat2D Y  = read_matrix_file("octane.csv", ',');
-    Mat2Dc P, W, R, Q, beta;
+    //Mat2D X_orig  = read_matrix_file("simpleX_orig.csv", ',');
+    //Mat2D Y_orig  = read_matrix_file("simpleY_orig.csv", ',');
+    Mat2D X_orig  = read_matrix_file("nir.csv", ',');
+    Mat2D Y_orig  = read_matrix_file("octane.csv", ',');
+    PLS_Model plsm;
+
+    int nobj  = X_orig.rows();
+    int npred = X_orig.cols();
+    int nresp = Y_orig.cols();
+
+    // Standardize X and Y, i.e. convert to Z-scores
+    Row Xmeans = col_means( X_orig );
+    Row Xstdev = col_stdev( X_orig, Xmeans );
+    Mat2D X = Mat2D::Zero(X_orig.rows(), X_orig.cols());
+    for (int r = 0; r<X.rows(); r++) { X.row(r) = (X_orig.row(r) - Xmeans).cwiseQuotient(Xstdev); }
+
+    Row Ymeans = col_means( Y_orig );
+    Row Ystdev = col_stdev( Y_orig, Ymeans );
+    Mat2D Y = Mat2D::Zero(Y_orig.rows(), Y_orig.cols());
+    for (int r = 0; r<Y.rows(); r++) { Y.row(r) = (Y_orig.row(r) - Ymeans).cwiseQuotient(Ystdev); }
+    //cout << X << "\n\n";
+    //cout << Y << "\n\n";
+
 
     for (int A = 1; A<11; A++) { // number of components to try
-        //int A = 1; 
 
-        P.setZero(X.cols(), A); //P = zeros(size(X)(2),A);
-        W.setZero(X.cols(), A); //W = zeros(size(X)(2),A);
-        R.setZero(X.cols(), A); //R = zeros(size(X)(2),A);
-        Q.setZero(Y.cols(), A);  //Q = zeros(size(Y)(2),A);
-
-        pls_algorithm2(X,Y,A, W,P,Q,R,beta);
+        plsm.initialize(npred, nresp, A);
+        pls_algorithm2(X,Y, plsm, KERNEL_TYPE1);
 
         //cout << setprecision(16) << X << endl;
         //cout << setprecision(6) << Y << endl;
 
-        cout << A << " components" << endl;
         // How well did we do?
-        cout << setprecision(6) << (Y-X*beta.real()).cwiseProduct(Y-X*beta.real()).sum() << endl;
+        cout << A << " components" << endl;
+        Mat2D Ypred = X*plsm.beta.real();
+        cout << setprecision(6) << (Y-Ypred).array().square().sum() << endl;
+        cout << setprecision(6) << (Y.array() - (Y.sum()/Y.rows())).square().sum() << endl;
+        cout << setprecision(6) << 1 - (Y-Ypred).array().square().sum() / (Y.array() - (Y.sum()/Y.rows())).square().sum() << endl;
     }
 
     return 0;

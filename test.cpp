@@ -4,7 +4,7 @@
 #include <fstream>
 #include <Eigen/Core>
 #include <Eigen/Eigenvalues>
-#include "Utility.h"
+#include "utility.h"
 
 using namespace std;
 

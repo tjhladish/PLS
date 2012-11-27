@@ -1,35 +1,65 @@
 #include "pls.h"
 
-int main() { 
-    //http://eigen.tuxfamily.org/dox/QuickRefPage.html
-    //Mat2D X_orig  = read_matrix_file("toyX.csv", ',');
-    //Mat2D Y_orig  = read_matrix_file("toyY.csv", ',');
-    //Mat2D X_orig  = read_matrix_file("simpleX_orig.csv", ',');
-    //Mat2D Y_orig  = read_matrix_file("simpleY_orig.csv", ',');
-    Mat2D X_orig  = read_matrix_file("nir.csv", ',');
-    Mat2D Y_orig  = read_matrix_file("octane.csv", ',');
-    PLS_Model plsm;
+//http://eigen.tuxfamily.org/dox/QuickRefPage.html
 
-    int nobj  = X_orig.rows();
-    int npred = X_orig.cols();
-    int nresp = Y_orig.cols();
-    
+int main(int argc, char *argv[]) { 
+    if (argc < 4) { fprintf(stderr, "Usage: ./pls X_data.csv Y_data.csv num_components\n"); exit(100); }
+    std::string x_filename(argv[1]);
+    std::string y_filename(argv[2]);
+
+    Mat2D X_orig  = read_matrix_file(x_filename, ',');
+    Mat2D Y_orig  = read_matrix_file(y_filename, ',');
+
+    //Mat2D X = X_orig ;
+    //Mat2D Y = Y_orig ;
     Mat2D X = colwise_z_scores( X_orig );
     Mat2D Y = colwise_z_scores( Y_orig );
 
-
-    plsm.initialize(npred, nresp, 10);
+    PLS_Model plsm;
+    int nobj  = X_orig.rows();
+    int npred = X_orig.cols();
+    int nresp = Y_orig.cols();
+    int ncomp = atoi(argv[3]);
+    plsm.initialize(npred, nresp, ncomp);
     plsm.plsr(X,Y, plsm, KERNEL_TYPE1);
 
-    //cout << setprecision(16) << X << endl;
-    //cout << setprecision(6) << Y << endl;
-
-    for (int A = 1; A<11; A++) { // number of components to try
-        // How well did we do?
+    // A is number of components to use
+    for (int A = 1; A<=ncomp; A++) { 
+        // How well did we do with this many components?
         cout << A << " components\t";
-        cout << "explained variance: " << plsm.explained_variance(X, Y, A) << endl;;
+        cout << "explained variance: " << plsm.explained_variance(X, Y, A);
+        //cout << "root mean squared error of prediction (RMSEP):" << plsm.rmsep(X, Y, A) << endl;
+        cout << " SSE: " << plsm.SSE(X,Y,A) <<  endl; 
     }
+
+    
+    cout << "Validation (PRESS):\n";
+    cout << plsm.loo_validation(X, Y, PRESS) << endl;
+    
+    cout << "Optimal number of components:\t" << plsm.optimal_num_components(X,Y) << endl;
+
+/*
+    cout << "Validation (RMSEP):\n";
+    cout << plsm.loo_validation(X, Y, RMSEP) << endl;
+
+    cout << "W:\n";
+    cout << plsm.W.colwise().sum() << endl << endl;
+
+    cout << "P:\n";
+    cout << plsm.P.colwise().sum() << endl << endl;
+
+    cout << "Q:\n";
+    cout << plsm.Q.colwise().sum() << endl << endl;
+
+    cout << "R:\n";
+    cout << plsm.R.colwise().sum() << endl << endl;
+
+    cout << "X:\n";
+    cout << X.sum() << endl << endl;
+
+    cout << "Y:\n";
+    cout << Y.sum() << endl << endl;
+*/
 
     return 0;
 }
-

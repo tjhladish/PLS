@@ -2,18 +2,21 @@
 #define UTILITY_H
 
 #include <iostream>
-//#include <cstdlib>
 #include <sstream>
 #include <vector>
-//#include <algorithm>
 #include <assert.h>
-//#include <iterator>
 #include <iomanip>
 #include <fstream>
 #include <Eigen/Core>
 #include <Eigen/Eigenvalues>
+#include <random>
+#include <chrono>
 
-//using namespace std;
+
+const int seed = chrono::system_clock::now().time_since_epoch().count();
+default_random_engine RNG(seed);
+uniform_real_distribution<double> runif(0,1);
+
 using namespace Eigen;
 
 #ifdef MPREAL_SUPPORT
@@ -38,8 +41,6 @@ inline double string2double(const std::string& s){ std::istringstream i(s); doub
 
 inline Row col_means( Mat2D mat ) { return mat.colwise().sum() / mat.rows(); }
 
-//int _sgn(float_type val) { return (0 < val) - (val < 0); }
-
 Mat2D read_matrix_file(std::string filename, char sep); 
 
 Row col_stdev( Mat2D mat, Row means );
@@ -55,5 +56,10 @@ std::vector<int> ordered(Col const& values);
 float_type wilcoxon(const Col err_1, const Col err_2);
 
 float_type normalcdf(float_type z);
+
+// N is the size of the sample space--which includes 0, so the int "N" itself will never get
+// returned in the sample.  sample is an empty vector that needs to be of size k
+void rand_nchoosek(int N, vector<int>& sample);
+
 
 #endif

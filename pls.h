@@ -31,7 +31,7 @@ class PLS_Model {
 
     //"Modified kernel algorithms 1 and 2"
     //from Dayal and MacGregor (1997) "Improved PLS Algorithms" J. of Chemometrics. 11,73-85.
-    void plsr(const Mat2D X, const Mat2D Y, PLS_Model& plsm, METHOD algorithm) {
+    void plsr(const Mat2D X, const Mat2D Y, METHOD algorithm) {
         method = algorithm;
         int M = Y.cols(); // Number of response variables == columns in Y
 
@@ -132,13 +132,60 @@ class PLS_Model {
         PLS_Model plsm_v;
         plsm_v.initialize(Xv.cols(), Yv.cols(), this->A);
         for (int i = 0; i < X.rows()-1; i++) {
-            plsm_v.plsr(Xv, Yv, plsm_v, this->method);
+            plsm_v.plsr(Xv, Yv, this->method);
             for (int j = 1; j <= this->A; j++) {
                 Row res = plsm_v.residuals(X.row(i), Y.row(i), j).row(0);
                 SSEv.col(j-1) += res.cwiseProduct(res).transpose();
             }
             Xv.row(i) = X.row(i); 
             Yv.row(i) = Y.row(i); 
+        }
+        if ( out_type == PRESS ) {
+            return SSEv;
+        } else if ( out_type = RMSEP ) {
+            SSEv /= X.rows();
+            return SSEv.cwiseSqrt();
+        }
+    }
+
+
+    // leave-some-out validation of model (i.e., are we overfitting?)
+    Mat2D lso_validation(const Mat2D& X, const Mat2D& Y, VALIDATION_OUTPUT out_type, float test_fraction, int num_trials) { 
+        const int N = X.rows();
+        const int test_size = (int) (test_fraction * N + 0.5);
+        const int train_size = N - test_size;
+        vector<int> sample(train_size);
+        Mat2D Xv(train_size, X.cols()); // values we're training on
+        Mat2D Yv(train_size, Y.cols());
+        Mat2D Xp(test_size, X.cols());  // values we're predicting
+        Mat2D Yp(test_size, Y.cols());
+
+        Mat2D SSEv = Mat2D::Zero(Y.cols(), this->A);
+        PLS_Model plsm_v;
+        plsm_v.initialize(Xv.cols(), Yv.cols(), this->A);
+        for (int rep = 0; rep < num_trials; ++rep) {
+            rand_nchoosek(N, sample);
+            int j=0;
+            int k=0;
+            for (unsigned int i=0; i<N; ++i) {
+                if( sample[j] == i ) { //in train set
+                    Xv.row(j) = X.row(i);
+                    Yv.row(j) = Y.row(i);
+                    j++; 
+                } else {               // in test set
+                    Xp.row(k) = X.row(i);
+                    Yp.row(k) = Y.row(i);
+                    k++; 
+                }
+            }
+
+            plsm_v.plsr(Xv, Yv, this->method);
+            for (int j = 1; j <= this->A; j++) {
+                Mat2D res = plsm_v.residuals(Xp, Yp, j);
+                //SSEv.col(j-1) += res.cwiseProduct(res).transpose(); <-- this line probably doesn't work for lso
+            }
+            //Xv.row(i) = X.row(i); 
+            ////Yv.row(i) = Y.row(i); 
         }
         if ( out_type == PRESS ) {
             return SSEv;
@@ -159,7 +206,7 @@ class PLS_Model {
         PLS_Model plsm_v;
         plsm_v.initialize(Xv.cols(), Yv.cols(), this->A);
         for (int i = 0; i < X.rows()-1; i++) {
-            plsm_v.plsr(Xv, Yv, plsm_v, this->method);
+            plsm_v.plsr(Xv, Yv, this->method);
             for (int j = 1; j <= this->A; j++) {
                 Row res = plsm_v.residuals(X.row(i), Y.row(i), j).row(0);
                 for (int k = 0; k < res.size(); k++) Ev[k](i,j-1) = res(k);

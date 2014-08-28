@@ -10,6 +10,7 @@ using std::cout;
 using std::cerr;
 using std::complex;
 using std::endl;
+using std::vector;
 
 typedef enum { KERNEL_TYPE1, KERNEL_TYPE2 } METHOD;
 typedef enum { PRESS, RMSEP } VALIDATION_OUTPUT;

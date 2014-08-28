@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
     int nresp = Y_orig.cols();
     int ncomp = atoi(argv[3]);
     plsm.initialize(npred, nresp, ncomp);
-    plsm.plsr(X,Y, plsm, KERNEL_TYPE1);
+    plsm.plsr(X,Y, KERNEL_TYPE1);
 
     // A is number of components to use
     for (int A = 1; A<=ncomp; A++) { 

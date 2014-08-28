@@ -282,7 +282,7 @@ void rand_nchoosek(int N, vector<int>& sample) {
     if ( k == 1 ) {
         // the following line had (newidx+1) instead of lastidx before, which
         // produced incorrect results when N == 1; this, I believe, is correct
-        uniform_int_distribution<int> randInt(0,(int) Nreal - 1);
+        std::uniform_int_distribution<int> randInt(0,(int) Nreal - 1);
         sample[i++] = lastidx + randInt(RNG); // truncated float on [0, Nreal]
     }
 }

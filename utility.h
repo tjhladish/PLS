@@ -13,9 +13,9 @@
 #include <chrono>
 
 
-const int seed = chrono::system_clock::now().time_since_epoch().count();
-default_random_engine RNG(seed);
-uniform_real_distribution<double> runif(0,1);
+const int seed = std::chrono::system_clock::now().time_since_epoch().count();
+static std::default_random_engine RNG(seed);
+static std::uniform_real_distribution<double> runif(0,1);
 
 using namespace Eigen;
 
@@ -59,7 +59,7 @@ float_type normalcdf(float_type z);
 
 // N is the size of the sample space--which includes 0, so the int "N" itself will never get
 // returned in the sample.  sample is an empty vector that needs to be of size k
-void rand_nchoosek(int N, vector<int>& sample);
+void rand_nchoosek(int N, std::vector<int>& sample);
 
 
 #endif

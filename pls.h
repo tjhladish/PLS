@@ -14,7 +14,31 @@ using std::vector;
 
 typedef enum { KERNEL_TYPE1, KERNEL_TYPE2 } REGRESSION_ALGORITHM;
 typedef enum { LOO, LSO } VALIDATION_METHOD;
-typedef enum { PRESS, RMSEP } VALIDATION_OUTPUT;
+typedef enum { PRESS, MSEP, RMSEP } VALIDATION_OUTPUT;
+
+/*
+    Variables and their interpretation from 
+    Dayal and MacGregor (1997) "Improved PLS Algorithms" J. of Chemometrics. 11,73-85.
+
+            X      predictor variables matrix (N × K)
+            Y      response variables matrix (N × M)
+            B_PLS  PLS regression coefficients matrix (K × M)
+            W      PLS weights matrix for X (K × A)
+            P      PLS loadings matrix for X (K × A)
+            Q      PLS loadings matrix for Y (M × A)
+            R      PLS weights matrix to compute scores T directly from original X (K × A)
+            T      PLS scores matrix of X (N × A)
+            w_a    a column vector of W
+            p_a    a column vector of P
+            q_a    a column vector of Q
+            r_a    a column vector of R
+            t_a    a column vector of T
+            K      number of X-variables
+            M      number of Y-variables
+            N      number of objects
+            A      number of components in PLS model
+            a      integer counter for latent variable dimension.
+*/
 
 class PLS_Model {
   public:
@@ -76,9 +100,30 @@ class PLS_Model {
             R.col(i)=r;
             if (algorithm == KERNEL_TYPE1) T.col(i) = t;
         }
+        if (algorithm == KERNEL_TYPE2) T = X*R; // not part of the algorithm; allows users to retrieve scores
         return; 
     }
 
+    Mat2Dc scores() { return scores(A); }
+    Mat2Dc scores(int comp) { 
+        assert (comp <= A);
+        assert (comp > 0);
+        return T.leftCols(comp);
+    }
+
+    Mat2Dc loadingsX() { return loadingsX(A); }
+    Mat2Dc loadingsX(int comp) { 
+        assert (comp <= A);
+        assert (comp > 0);
+        return P.leftCols(comp);
+    }
+
+    Mat2Dc loadingsY() { return loadingsY(A); }
+    Mat2Dc loadingsY(int comp) { 
+        assert (comp <= A);
+        assert (comp > 0);
+        return Q.leftCols(comp);
+    }
  
     // compute the regression coefficients (aka 'beta')
     Mat2Dc coefficients() { return coefficients(A); }
@@ -157,10 +202,6 @@ class PLS_Model {
 
         for (int j = 0; j < this->A; j++) {
             Mat2D res = Ev[j];
-//            for (int i = 0; i < X.rows(); i++) {
-//                Row res = resmat.row(i);
-//                SSEv.col(j) += res.cwiseProduct(res).transpose();
-//            }
             Mat2D SE  = res.cwiseProduct(res);
             // rows in SSEv correspond to different parameters
             // Collapse the squared errors so that we're summing over all predicted rows
@@ -169,9 +210,14 @@ class PLS_Model {
         }
         if ( out_type == PRESS ) {
             return SSEv;
-        } else if ( out_type = RMSEP ) {
+        } else {
             SSEv /= X.rows();
-            return SSEv.cwiseSqrt();
+            if ( out_type = MSEP ) { 
+                return SSEv;
+            } else {
+                // RMSEP
+                return SSEv.cwiseSqrt();
+            }
         }
     }
 
@@ -194,11 +240,11 @@ class PLS_Model {
             int j=0;
             int k=0;
             for (unsigned int i=0; i<N; ++i) {
-                if( sample[j] == i ) { //in train set
+                if( sample[j] == i ) { // in training set
                     Xv.row(j) = X.row(i);
                     Yv.row(j) = Y.row(i);
                     j++; 
-                } else {               // in test set
+                } else {               // in testing set
                     Xp.row(k) = X.row(i);
                     Yp.row(k) = Y.row(i);
                     k++; 
@@ -234,9 +280,14 @@ class PLS_Model {
         }
         if ( out_type == PRESS ) {
             return SSEv;
-        } else if ( out_type = RMSEP ) {
+        } else {
             SSEv /= num_residuals;
-            return SSEv.cwiseSqrt();
+            if ( out_type = MSEP ) { 
+                return SSEv;
+            } else {
+                // RMSEP
+                return SSEv.cwiseSqrt();
+            }
         }
     }
     
@@ -293,13 +344,11 @@ class PLS_Model {
             for (int j=0; j<min_press_idx(i); j++) {      // for each smaller number of components
                 Col err1 = errors[min_press_idx(i)].col(i);
                 Col err2 = errors[j].col(i);
-        //        cerr << wilcoxon(err1, err2) << "\t";
                 if (wilcoxon(err1, err2) > ALPHA) {
                     best_comp(i) = j+1; // +1 to convert from index to component number
                     break;
                 }
             }
-        //    cerr << endl;
         }
 
         return best_comp;

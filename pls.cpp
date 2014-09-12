@@ -38,8 +38,6 @@ int main(int argc, char *argv[]) {
     //cout << looSSE << endl;
     Mat2D looRMSEP = plsm.loo_validation(X, Y, RMSEP);
     cout << looRMSEP << endl;
-//    Mat2D looRMSEP = (looSSE / X.rows()).cwiseSqrt();
-//    cout << looRMSEP << endl;
 
     cout << "Validation (lso):\n";
     //Mat2D lsoSSE = plsm.lso_validation(X, Y, PRESS, 0.3, X.rows());
@@ -49,8 +47,10 @@ int main(int argc, char *argv[]) {
     
     cout << "Optimal number of components (loo):\t" << plsm.loo_optimal_num_components(X,Y) << endl;
     cout << "Optimal number of components (lso):\t" << plsm.lso_optimal_num_components(X,Y,0.3,10*X.rows()) << endl;
-
+    
 /*
+    cout << plsm.scores() << endl << endl; 
+
     cout << "Validation (RMSEP):\n";
     cout << plsm.loo_validation(X, Y, RMSEP) << endl;
 

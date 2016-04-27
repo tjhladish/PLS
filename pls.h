@@ -212,7 +212,7 @@ class PLS_Model {
             return SSEv;
         } else {
             SSEv /= X.rows();
-            if ( out_type = MSEP ) { 
+            if ( out_type == MSEP ) { 
                 return SSEv;
             } else {
                 // RMSEP
@@ -282,7 +282,7 @@ class PLS_Model {
             return SSEv;
         } else {
             SSEv /= num_residuals;
-            if ( out_type = MSEP ) { 
+            if ( out_type == MSEP ) { 
                 return SSEv;
             } else {
                 // RMSEP

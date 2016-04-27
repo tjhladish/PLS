@@ -1,6 +1,6 @@
 CFLAGS=--ansi --pedantic -std=c++0x -O2
 #CFLAGS=--ansi --pedantic -std=c++0x -g 
-INCLUDE= -I/home/tjhladish/work/lib/eigen/ 
+INCLUDE= -I.
 all: pls
 
 pls: pls.cpp 

@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
     int nresp = Y_orig.cols();
     int ncomp = atoi(argv[3]);
     plsm.initialize(npred, nresp, ncomp);
-    plsm.plsr(X,Y, plsm, KERNEL_TYPE1);
+    plsm.plsr(X,Y, KERNEL_TYPE1);
 
     // A is number of components to use
     for (int A = 1; A<=ncomp; A++) { 
@@ -33,12 +33,24 @@ int main(int argc, char *argv[]) {
     }
 
     
-    cout << "Validation (PRESS):\n";
-    cout << plsm.loo_validation(X, Y, PRESS) << endl;
-    
-    cout << "Optimal number of components:\t" << plsm.optimal_num_components(X,Y) << endl;
+    cout << "Validation (loo):\n";
+    //Mat2D looSSE = plsm.loo_validation(X, Y, PRESS);
+    //cout << looSSE << endl;
+    Mat2D looRMSEP = plsm.loo_validation(X, Y, RMSEP);
+    cout << looRMSEP << endl;
 
+    cout << "Validation (lso):\n";
+    //Mat2D lsoSSE = plsm.lso_validation(X, Y, PRESS, 0.3, X.rows());
+    //cout << lsoSSE << endl;
+    Mat2D lsoRMSEP = plsm.lso_validation(X, Y, RMSEP, 0.3, 10*X.rows());
+    cout << lsoRMSEP << endl;
+    
+    cout << "Optimal number of components (loo):\t" << plsm.loo_optimal_num_components(X,Y) << endl;
+    cout << "Optimal number of components (lso):\t" << plsm.lso_optimal_num_components(X,Y,0.3,10*X.rows()) << endl;
+    
 /*
+    cout << plsm.scores() << endl << endl; 
+
     cout << "Validation (RMSEP):\n";
     cout << plsm.loo_validation(X, Y, RMSEP) << endl;
 

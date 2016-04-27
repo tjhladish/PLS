@@ -251,5 +251,40 @@ double normal_cdf(double x, double mu, double var) {
     }
 }*/
 
+void rand_nchoosek(int N, vector<int>& sample) {
+    if (sample.size() == 0 ) return;
+    int k = sample.size();       // k is specified by size of requested vector
+
+    assert( k <= N );
+
+    int top = N-k;
+    double Nreal = (double) N;
+
+    int newidx=0;
+    int lastidx=0;
+    int i=0;
+
+    while ( k >= 2 ) {
+        double V = runif(RNG);
+        //double V = mtrand->rand();
+        int S=0;
+        double quot = top/Nreal;
+        while( quot > V ) {
+            S++; top-=1; Nreal-=1;
+            quot =(quot*top)/Nreal;
+        }
+        //skip over the next S records and select the following one for the sample
+        newidx = lastidx + S;
+        sample[i]=newidx; lastidx = newidx+1; i++;
+        Nreal -= 1.0; k -= 1;
+    }
+
+    if ( k == 1 ) {
+        // the following line had (newidx+1) instead of lastidx before, which
+        // produced incorrect results when N == 1; this, I believe, is correct
+        std::uniform_int_distribution<int> randInt(0,(int) Nreal - 1);
+        sample[i++] = lastidx + randInt(RNG); // truncated float on [0, Nreal]
+    }
+}
 
 

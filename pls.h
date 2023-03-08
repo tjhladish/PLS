@@ -1,358 +1,200 @@
 #ifndef PLS_H
 #define PLS_H
 
-#include "utility.h"
+#include <Eigen/Eigenvalues>
+#include <vector>
+#include <iostream>
+
+#ifdef MPREAL_SUPPORT
+#include "mpreal.h"
+#include <unsupported/Eigen/MPRealSupport>
+    using namespace mpfr;
+    typedef mpreal float_type;
+#else
+    typedef double float_type;
+#endif
+
+#include <algorithm> // sort
+#include <numeric> // iota
+
+// tag/index sort, from https://stackoverflow.com/a/37732329/167973
+template<typename T>
+std::vector<size_t> ordered(const T& v) {
+    std::vector<size_t> result(v.size());
+    std::iota(std::begin(result), std::end(result), 0);
+    std::sort(
+        std::begin(result), std::end(result),
+        [&v](const auto & lhs, const auto & rhs) {
+            return *(v.begin() + lhs) < *(v.begin()+ rhs);
+        }
+    );
+    return result;
+}
+
 
 //using namespace std;
 using namespace Eigen;
 
-using std::cout;
-using std::cerr;
 using std::complex;
-using std::endl;
-using std::vector;
 
-typedef enum { KERNEL_TYPE1, KERNEL_TYPE2 } REGRESSION_ALGORITHM;
-typedef enum { LOO, LSO } VALIDATION_METHOD;
-typedef enum { PRESS, MSEP, RMSEP } VALIDATION_OUTPUT;
+typedef Matrix<float_type, Dynamic, Dynamic> Mat2D;
+typedef Matrix<float_type, Dynamic, 1>  Col;
+typedef Matrix<int, Dynamic, 1>  Coli;
+typedef Matrix<size_t, Dynamic, 1>  Colsz;
+typedef Matrix<float_type, 1, Dynamic>  Row;
+typedef Matrix<int, 1, Dynamic>  Rowi;
+typedef Matrix<size_t, 1, Dynamic>  Rowsz;
+typedef Matrix<complex<float_type>, Dynamic, Dynamic> Mat2Dc;
+typedef Matrix<complex<float_type>, Dynamic, 1>  Colc;
+
+typedef enum { KERNEL_TYPE1, KERNEL_TYPE2 } METHOD;
+typedef enum { PRESS, RMSEP } VALIDATION_OUTPUT;
+typedef enum { LOO, NEW_DATA } VALIDATION_METHOD;
 
 /*
-    Variables and their interpretation from 
-    Dayal and MacGregor (1997) "Improved PLS Algorithms" J. of Chemometrics. 11,73-85.
+ *   Variable definitions from source paper:
+ *     X     : predictor variables matrix (N × K)
+ *     Y     : response variables matrix (N × M)
+ *     B_PLS : PLS regression coefficients matrix (K × M)
+ *     W     : PLS weights matrix for X (K × A)
+ *     P     : PLS loadings matrix for X (K × A)
+ *     Q     : PLS loadings matrix for Y (M × A)
+ *     R     : PLS weights matrix to compute scores T directly from original X (K × A)
+ *     T     : PLS scores matrix of X (N × A)
+ *     w_a   : a column vector of W
+ *     p_a   : a column vector of P
+ *     q_a   : a column vector of Q
+ *     r_a   : a column vector of R
+ *     t_a   : a column vector of T
+ *     K     : number of X-variables
+ *     M     : number of Y-variables
+ *     N     : number of objects
+ *     A     : number of components in PLS model
+ *     a     : integer counter for latent variable dimension
+ */
 
-            X      predictor variables matrix (N × K)
-            Y      response variables matrix (N × M)
-            B_PLS  PLS regression coefficients matrix (K × M)
-            W      PLS weights matrix for X (K × A)
-            P      PLS loadings matrix for X (K × A)
-            Q      PLS loadings matrix for Y (M × A)
-            R      PLS weights matrix to compute scores T directly from original X (K × A)
-            T      PLS scores matrix of X (N × A)
-            w_a    a column vector of W
-            p_a    a column vector of P
-            q_a    a column vector of Q
-            r_a    a column vector of R
-            t_a    a column vector of T
-            K      number of X-variables
-            M      number of Y-variables
-            N      number of objects
-            A      number of components in PLS model
-            a      integer counter for latent variable dimension.
-*/
+// helper methods
+template<typename MATTYPE>
+size_t find_dominant_ev(const EigenSolver<MATTYPE> es) {
+    auto eig_val = es.eigenvalues();
+    float_type m = 0;
+    size_t idx = 0;
 
-class PLS_Model {
-  public:
-    Mat2Dc P, W, R, Q, T;
-    int A;
-    REGRESSION_ALGORITHM algorithm;
-    void initialize(int num_predictors, int num_responses, int num_components) {
-        A = num_components; 
-        P.setZero(num_predictors, num_components);
-        W.setZero(num_predictors, num_components);
-        R.setZero(num_predictors, num_components);
-        Q.setZero(num_responses, num_components);
-        // T will be initialized if needed
-        return;
-    }
-
-    //"Modified kernel algorithms 1 and 2"
-    //from Dayal and MacGregor (1997) "Improved PLS Algorithms" J. of Chemometrics. 11,73-85.
-    void plsr(const Mat2D X, const Mat2D Y, REGRESSION_ALGORITHM _algorithm) {
-        algorithm = _algorithm;
-        int M = Y.cols(); // Number of response variables == columns in Y
-
-        if (algorithm == KERNEL_TYPE1) T.setZero(X.rows(), A);
-
-        Mat2D XY = X.transpose() * Y;
-        Mat2D XX;
-        if (algorithm == KERNEL_TYPE2) XX = X.transpose() * X;
-
-        for (int i=0; i<A; i++) {
-            Colc w, p, q, r, t; 
-            complex<float_type> tt;
-            if (M==1) {
-                w = XY.cast<complex<float_type> >();
-            } else {
-                EigenSolver<Mat2D> es( (XY.transpose() * XY) );
-                q = dominant_eigenvector(es);
-                w = (XY*q);
+    for (size_t i = 0; i < static_cast<size_t>(eig_val.size()); i++) {
+        if (imag(eig_val[i]) == 0) {
+            if (abs(eig_val[i]) > m) {
+                m = abs(eig_val[i]);
+                idx = i;
             }
-
-            w /= sqrt((w.transpose()*w)(0,0)); // use normalize function from eigen?
-            r=w;
-            for (int j=0; j<=i-1; j++) {
-                r -= (P.col(j).transpose()*w)(0,0)*R.col(j);
-            }
-            if (algorithm == KERNEL_TYPE1) {
-                t = X*r;
-                tt = (t.transpose()*t)(0,0);
-                p.noalias() = (X.transpose()*t);
-            } else if (algorithm == KERNEL_TYPE2) {
-                tt = (r.transpose()*XX*r)(0,0);
-                p.noalias() = (r.transpose()*XX).transpose();
-            }
-            p /= tt;
-            q.noalias() = (r.transpose()*XY).transpose(); q /= tt;
-            XY -= ((p*q.transpose())*tt).real(); // is casting this to 'real' always safe?
-            W.col(i)=w;
-            P.col(i)=p;
-            Q.col(i)=q;
-            R.col(i)=r;
-            if (algorithm == KERNEL_TYPE1) T.col(i) = t;
         }
-        if (algorithm == KERNEL_TYPE2) T = X*R; // not part of the algorithm; allows users to retrieve scores
-        return; 
+    }
+    return idx;
+
+}
+
+// converts an Eigen vector type (Row or Col) to a std::vector
+template<typename EIGENTYPE>
+std::vector<float_type> to_cvector(const EIGENTYPE & data) {
+    std::vector<float_type> vec(data.size());
+    for (size_t i = 0; i < static_cast<size_t>(data.size()); i++) vec[i] = data[i];
+    return vec;
+}
+
+// converts a std::vector to an Eigen vector type (Row or Col)
+template<typename EIGENTYPE>
+inline EIGENTYPE to_evector(const std::vector<float_type> & data) {
+    EIGENTYPE row(data.size());
+    for (size_t i = 0; i < data.size(); i++) row[i] = data[i];
+    return row;
+}
+
+namespace PLS {
+    // input helper functions
+    std::vector<string> split(const std::string & s, const char separator = ',');
+    Mat2D read_matrix_file(const string & filename, const char sep, const bool verbose = false, std::ostream & os = std::cerr);
+
+    // PLS common functions
+    Row colwise_stdev(const Mat2D & mat, const Row & means);
+    Mat2D colwise_z_scores( const Mat2D & mat, const Row & mean, const Row & stdev);
+    Mat2D colwise_z_scores( const Mat2D & mat );
+
+}
+
+struct PLS_Model {
+
+    PLS_Model(
+      const size_t num_predictors, const size_t num_responses, const size_t num_components
+    ) : A(num_components) {
+        P.setZero(num_predictors, A);
+        W.setZero(num_predictors, A);
+        R.setZero(num_predictors, A);
+        Q.setZero(num_responses, A);
+        // T will be initialized if needed
     }
 
-    Mat2Dc scores() { return scores(A); }
-    Mat2Dc scores(int comp) { 
-        assert (comp <= A);
-        assert (comp > 0);
-        return T.leftCols(comp);
+    PLS_Model(
+        const Mat2D& X, const Mat2D& Y,
+        const size_t num_components,
+        const METHOD algorithm = KERNEL_TYPE1
+    ) : PLS_Model(X.cols(), Y.cols(), num_components) {
+        method = algorithm;
+        plsr(X, Y, algorithm);
     }
 
-    Mat2Dc loadingsX() { return loadingsX(A); }
-    Mat2Dc loadingsX(int comp) { 
-        assert (comp <= A);
-        assert (comp > 0);
-        return P.leftCols(comp);
-    }
+    PLS_Model& plsr (const Mat2D& X, const Mat2D& Y, const METHOD algorithm);
 
-    Mat2Dc loadingsY() { return loadingsY(A); }
-    Mat2Dc loadingsY(int comp) { 
-        assert (comp <= A);
-        assert (comp > 0);
-        return Q.leftCols(comp);
-    }
- 
+    // latent X values, i.e. the orthogonal metrics you wish you could measure
+    const Mat2Dc scores(const Mat2D& X_new, const size_t comp) const;
+    const Mat2Dc scores(const Mat2D& X_new) const { return scores(X_new, A); }
+
     // compute the regression coefficients (aka 'beta')
-    Mat2Dc coefficients() { return coefficients(A); }
-    Mat2Dc coefficients(int comp) {
-        assert (comp <= A);
-        assert (comp > 0);
-        return R.leftCols(comp)*Q.leftCols(comp).transpose();
-    }
+    const Mat2Dc coefficients(const size_t comp) const;
+    const Mat2Dc coefficients() const { return coefficients(A); }
+
 
     // predicted Y values, given X values and pls model
-    Mat2D fitted_values(const Mat2D& X) { return fitted_values(X, A); }
-    Mat2D fitted_values(const Mat2D& X, int comp) {
-        return X*coefficients(comp).real();
-    }
+    const Mat2D fitted_values(const Mat2D& X, const size_t comp) const;
+    const Mat2D fitted_values(const Mat2D& X) const { return fitted_values(X, A); }
 
     // unexplained portion of Y values
-    Mat2D residuals(const Mat2D& X, const Mat2D& Y) { return residuals(X, Y, A); }
-    Mat2D residuals(const Mat2D& X, const Mat2D& Y, int comp) {
-        return Y - fitted_values(X, comp);
-    }
-    
+    const Mat2D residuals(const Mat2D& X, const Mat2D& Y, const size_t comp) const;
+    const Mat2D residuals(const Mat2D& X, const Mat2D& Y) const { return residuals(X, Y, A); }
+
     // Sum of squared errors
-    Row SSE(const Mat2D& X, const Mat2D& Y) { return this->SSE(X, Y, A); }
-    Row SSE(const Mat2D& X, const Mat2D& Y, int comp) {
-        return residuals(X, Y, comp).colwise().squaredNorm();
-    }
+    const Row SSE(const Mat2D& X, const Mat2D& Y, const size_t comp) const;
+    const Row SSE(const Mat2D& X, const Mat2D& Y) const { return SSE(X, Y, A); }
 
     // Total sum of squares
-    Row SST(const Mat2D& Y) { 
-        Row sst(Y.cols());
-        for (int c = 0; c < Y.cols(); c++) {
-            sst(c) = (Y.col(c).array() - (Y.col(c).sum()/Y.rows())).square().sum();
-        }
-        return sst;
-    }
+    const Row SST(const Mat2D& Y) const;
 
     // fraction of explainable variance
-    Row explained_variance(const Mat2D& X, const Mat2D& Y) { return explained_variance(X, Y, A); }
-    Row explained_variance(const Mat2D& X, const Mat2D& Y, int comp) {
-        assert (comp <= A);
-        assert (comp > 0);
-    //    cerr << "ev: " << this->SSE(X, Y, comp).cwiseQuotient( SST(Y) ) << endl;
-        return (1.0 - this->SSE(X, Y, comp).cwiseQuotient( SST(Y) ).array()).matrix(); 
-    }
-
-    std::vector<Mat2D> _loo_cv_residual_matrix(const Mat2D& X, const Mat2D& Y) { 
-        Mat2D Xv = X.bottomRows(X.rows()-1);
-        Mat2D Yv = Y.bottomRows(Y.rows()-1);
-       
-        // vector of error matrices(rows=Y.rows(), cols=Y.cols())
-        // col = Y category #, row = obs #, tier = component
-        std::vector<Mat2D> Ev(this->A, Mat2D::Zero(X.rows(), Y.cols()));
-
-        PLS_Model plsm_v;
-        plsm_v.initialize(Xv.cols(), Yv.cols(), this->A);
-        for (int i = 0; i < X.rows(); i++) {
-            plsm_v.plsr(Xv, Yv, this->algorithm);
-            for (int j = 0; j < this->A; j++) {
-                Row res = plsm_v.residuals(X.row(i), Y.row(i), j+1).row(0); // convert j to number of components
-                for (int k = 0; k < res.size(); k++) Ev[j](i,k) = res(k);
-            }
-            if ( i < Xv.rows() ) {
-                // we haven't run out of rows to swap out yet
-                Xv.row(i) = X.row(i); 
-                Yv.row(i) = Y.row(i); 
-            }
-        }
-        return Ev;
-    }
-
+    const Row explained_variance(const Mat2D& X, const Mat2D& Y, const size_t comp) const;
+    const Row explained_variance(const Mat2D& X, const Mat2D& Y) const { return explained_variance(X, Y, A); }
 
     // leave-one-out validation of model (i.e., are we overfitting?)
-    Mat2D loo_validation(const Mat2D& X, const Mat2D& Y, VALIDATION_OUTPUT out_type) { 
-        std::vector<Mat2D> Ev = _loo_cv_residual_matrix(X,Y);
-        Mat2D SSEv = Mat2D::Zero(Y.cols(), this->A);
+    Mat2D loo_validation(const Mat2D& X, const Mat2D& Y, const VALIDATION_OUTPUT out_type) const;
 
-        for (int j = 0; j < this->A; j++) {
-            Mat2D res = Ev[j];
-            Mat2D SE  = res.cwiseProduct(res);
-            // rows in SSEv correspond to different parameters
-            // Collapse the squared errors so that we're summing over all predicted rows
-            // then transpose, so that rows now represent different parameters
-            SSEv.col(j) += SE.colwise().sum().transpose();
-        }
-        if ( out_type == PRESS ) {
-            return SSEv;
-        } else {
-            SSEv /= X.rows();
-            if ( out_type == MSEP ) { 
-                return SSEv;
-            } else {
-                // RMSEP
-                return SSEv.cwiseSqrt();
-            }
-        }
-    }
+    std::vector<Mat2D> _loo_cv_error_matrix(const Mat2D& X, const Mat2D& Y) const;
+    std::vector<Mat2D> _new_data_cv_error_matrix(const Mat2D& X_new, const Mat2D& Y_new) const;
 
+    // if val_method is LOO, X and Y should be original data
+    // if val_method is NEW_DATA, X and Y should be observations not included in the original model
+    const Rowsz optimal_num_components(const Mat2D& X, const Mat2D& Y, const VALIDATION_METHOD val_method) const;
 
-    std::vector<Mat2D> _lso_cv_residual_matrix(const Mat2D& X, const Mat2D& Y, const float test_fraction, const int num_trials) { 
-        const int N = X.rows();
-        const int test_size = (int) (test_fraction * N + 0.5);
-        const int train_size = N - test_size;
-        std::vector<Mat2D> Ev(this->A, Mat2D::Zero(num_trials*test_size, Y.cols()));
-        vector<int> sample(train_size);
-        Mat2D Xv(train_size, X.cols()); // values we're training on
-        Mat2D Yv(train_size, Y.cols());
-        Mat2D Xp(test_size, X.cols());  // values we're predicting
-        Mat2D Yp(test_size, Y.cols());
+    // output methods
+    void print_explained_variance(const Mat2D& X, const Mat2D& Y, std::ostream& os = std::cerr) const;
+    void print_state(std::ostream& os) const;
+    void print_model_assessment(
+        const Mat2D & X, const Mat2D & Y,
+        const size_t training_size, const size_t testing_size,
+        const size_t optimal_components, const size_t used_components,
+        std::ostream& os = std::cerr
+    ) const;
 
-        PLS_Model plsm_v;
-        plsm_v.initialize(Xv.cols(), Yv.cols(), this->A);
-        for (int rep = 0; rep < num_trials; ++rep) {
-            rand_nchoosek(N, sample);
-            int j=0;
-            int k=0;
-            for (unsigned int i=0; i<N; ++i) {
-                if( sample[j] == i ) { // in training set
-                    Xv.row(j) = X.row(i);
-                    Yv.row(j) = Y.row(i);
-                    j++; 
-                } else {               // in testing set
-                    Xp.row(k) = X.row(i);
-                    Yp.row(k) = Y.row(i);
-                    k++; 
-                }
-            }
-
-            plsm_v.plsr(Xv, Yv, this->algorithm);
-            for (int j = 0; j < this->A; j++) {
-                Mat2D res = plsm_v.residuals(Xp, Yp, j+1); // convert j to number of components
-                Ev[j].middleRows(rep*test_size, test_size) = res; // write to submatrix; middleRows(startRow, numRows)
-            }
-        }
-
-        return Ev;
-    }
-
-
-    // leave-some-out validation of model (i.e., are we overfitting?)
-    Mat2D lso_validation(const Mat2D& X, const Mat2D& Y, VALIDATION_OUTPUT out_type, float test_fraction, int num_trials) { 
-        const std::vector<Mat2D> Ev = _lso_cv_residual_matrix(X, Y, test_fraction, num_trials);
-        assert(Ev.size() > 0);
-        const int num_residuals = Ev[0].rows();
-        Mat2D SSEv = Mat2D::Zero(Y.cols(), this->A);
-
-        for (int j = 0; j < this->A; j++) {
-            Mat2D res = Ev[j];
-            // square all of the residuals
-            Mat2D SE  = res.cwiseProduct(res);
-            // rows in SSEv correspond to different parameters
-            // Collapse the squared errors so that we're summing over all predicted rows
-            // then transpose, so that rows now represent different parameters
-            SSEv.col(j) += SE.colwise().sum().transpose();
-        }
-        if ( out_type == PRESS ) {
-            return SSEv;
-        } else {
-            SSEv /= num_residuals;
-            if ( out_type == MSEP ) { 
-                return SSEv;
-            } else {
-                // RMSEP
-                return SSEv.cwiseSqrt();
-            }
-        }
-    }
-    
-
-    Rowi loo_optimal_num_components(const Mat2D& X, const Mat2D& Y) { 
-        const int dummy = 0;
-        return _optimal_num_components(X, Y, LOO, dummy, dummy);
-    }
-
-
-    Rowi lso_optimal_num_components(const Mat2D& X, const Mat2D& Y, const float test_fraction, const int num_trials) { 
-        return _optimal_num_components(X, Y, LSO, test_fraction, num_trials);
-    }
-
-
-    Rowi _optimal_num_components(const Mat2D& X, const Mat2D& Y, const VALIDATION_METHOD vmethod, const float test_fraction, const int num_trials) { 
-        // tier = component #, col = Y category, row = obs #
-        std::vector<Mat2D> errors;
-        if (vmethod == LOO) {
-            errors = _loo_cv_residual_matrix(X,Y);
-        } else if (vmethod == LSO) {
-            errors = _lso_cv_residual_matrix(X, Y, test_fraction, num_trials);
-        }
-        Mat2D press = Mat2D::Zero(Y.cols(), this->A);
-        Rowi min_press_idx = Rowi::Zero(Y.cols());
-        Row  min_press_val(Y.cols());
-        Rowi best_comp(Y.cols());
-        
-        // Determine PRESS values
-        for (int j = 0; j < this->A; j++) {
-            Mat2D resmat = errors[j];
-            for (int i = 0; i < X.rows(); i++) {
-                Row res = resmat.row(i);
-                press.col(j) += res.cwiseProduct(res).transpose();
-            }
-        }
-        
-        min_press_val = press.col(0);
-        // Find the component number that minimizes PRESS for each Y category
-        for (int i=0; i<press.rows(); i++) {              // for each Y category
-            for (int j = 0; j < this->A; j++) {
-                if (press(i,j) < min_press_val(i)) {
-                    min_press_val(i) = press(i,j);
-                    min_press_idx(i) = j;
-                }
-            }
-        }
-
-        best_comp = min_press_idx.array() + 1;
-        // Find the min number of components that is not significantly
-        // different from the min PRESS at alpha = 0.1 for each Y category
-        const float ALPHA = 0.1;
-        for (int i=0; i<press.rows(); i++) {              // for each Y category
-            for (int j=0; j<min_press_idx(i); j++) {      // for each smaller number of components
-                Col err1 = errors[min_press_idx(i)].col(i);
-                Col err2 = errors[j].col(i);
-                if (wilcoxon(err1, err2) > ALPHA) {
-                    best_comp(i) = j+1; // +1 to convert from index to component number
-                    break;
-                }
-            }
-        }
-
-        return best_comp;
-    }
+    private:
+        size_t A; // number of components
+        Mat2Dc P, W, R, Q, T;
+        METHOD method;
 
 };
 

@@ -10,8 +10,5 @@ pls.o: pls.cpp pls.h
 pls: pls_main.cpp pls.o
 	$(CPP) $(CFLAGS) $< -o $@
 
-test: test.cpp 
-	g++ $(CFLAGS) $(INCLUDE) test.cpp utility.cpp -o test 
-
 clean:
 	rm pls.o pls

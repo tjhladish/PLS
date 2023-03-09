@@ -5,7 +5,7 @@
 
 namespace PLS {
     
-    std::vector<string> split(const std::string & s, const char separator); {
+    std::vector<std::string> split(const std::string & s, const char separator); {
         size_t i = 0;
         size_t j = s.find(c);
         std::vector<string> result;
@@ -437,3 +437,22 @@ void PLS_Model::print_model_assessment(
     os << "Optimal number of components for each parameter (validation method == NEW DATA):\t" << optimal_components << std::endl;
     os << "Using " << used_components << " components." << std::endl;
 };
+
+void PLS_Model::print_validation(
+    const Mat2D & X, const Mat2D & Y,
+    const size_t training_size, const size_t testing_size,
+    const size_t optimal_components, const size_t used_components,
+    std::ostream& os
+) {
+    os << "Validation (loo):" << std::endl;
+    Mat2D looRMSEP = plsm.loo_validation(X, Y, RMSEP);
+    os << looRMSEP << std::endl;
+
+    os << "Validation (lso):" << std::endl;
+    Mat2D lsoRMSEP = plsm.lso_validation(X, Y, RMSEP, 0.3, 10*X.rows());
+    os << lsoRMSEP << std::endl;
+    
+    os << "Optimal number of components (loo):\t" << plsm.loo_optimal_num_components(X,Y) << std::endl;
+    os << "Optimal number of components (lso):\t" << plsm.lso_optimal_num_components(X,Y,0.3,10*X.rows()) << std::endl;
+
+}    

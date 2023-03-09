@@ -47,10 +47,6 @@ typedef Matrix<size_t, 1, Dynamic>  Rowsz;
 typedef Matrix<complex<float_type>, Dynamic, Dynamic> Mat2Dc;
 typedef Matrix<complex<float_type>, Dynamic, 1>  Colc;
 
-typedef enum { KERNEL_TYPE1, KERNEL_TYPE2 } METHOD;
-typedef enum { PRESS, RMSEP } VALIDATION_OUTPUT;
-typedef enum { LOO, NEW_DATA } VALIDATION_METHOD;
-
 /*
  *   Variable definitions from source paper:
  *     X     : predictor variables matrix (N × K)
@@ -118,9 +114,16 @@ namespace PLS {
     Mat2D colwise_z_scores( const Mat2D & mat, const Row & mean, const Row & stdev);
     Mat2D colwise_z_scores( const Mat2D & mat );
 
+    // PLS enumerated types
+    typedef enum { KERNEL_TYPE1, KERNEL_TYPE2 } METHOD;
+    typedef enum { PRESS, RMSEP } VALIDATION_OUTPUT;
+    typedef enum { LOO, LSO, NEW_DATA } VALIDATION_METHOD;
+
 }
 
 struct PLS_Model {
+
+    using namespace PLS;
 
     PLS_Model(
       const size_t num_predictors, const size_t num_responses, const size_t num_components
@@ -146,6 +149,12 @@ struct PLS_Model {
     // latent X values, i.e. the orthogonal metrics you wish you could measure
     const Mat2Dc scores(const Mat2D& X_new, const size_t comp) const;
     const Mat2Dc scores(const Mat2D& X_new) const { return scores(X_new, A); }
+
+    const Mat2Dc loadingsX(const size_t comp) const;
+    const Mat2Dc loadingsX() const { return loadingsX(A); }
+
+    const Mat2Dc loadingsY(const size_t comp) const; 
+    const Mat2Dc loadingsY() const { return loadingsY(A); }
 
     // compute the regression coefficients (aka 'beta')
     const Mat2Dc coefficients(const size_t comp) const;
@@ -173,13 +182,17 @@ struct PLS_Model {
 
     // leave-one-out validation of model (i.e., are we overfitting?)
     Mat2D loo_validation(const Mat2D& X, const Mat2D& Y, const VALIDATION_OUTPUT out_type) const;
+    Mat2D lso_validation(const Mat2D& X, const Mat2D& Y, const VALIDATION_OUTPUT out_type, const float_type test_fraction, const size_t num_trials);
 
     std::vector<Mat2D> _loo_cv_error_matrix(const Mat2D& X, const Mat2D& Y) const;
+    std::vector<Mat2D> _lso_cv_error_matrix(const Mat2D& X, const Mat2D& Y) const;
     std::vector<Mat2D> _new_data_cv_error_matrix(const Mat2D& X_new, const Mat2D& Y_new) const;
 
     // if val_method is LOO, X and Y should be original data
     // if val_method is NEW_DATA, X and Y should be observations not included in the original model
-    const Rowsz optimal_num_components(const Mat2D& X, const Mat2D& Y, const VALIDATION_METHOD val_method) const;
+    const Rowsz optimal_num_components(
+        const Mat2D& X, const Mat2D& Y, const VALIDATION_METHOD val_method
+    ) const;
 
     // output methods
     void print_explained_variance(const Mat2D& X, const Mat2D& Y, std::ostream& os = std::cerr) const;

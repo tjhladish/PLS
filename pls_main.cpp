@@ -24,19 +24,11 @@ int main(int argc, char *argv[]) {
     int npred = X_orig.cols();
     int nresp = Y_orig.cols();
     int ncomp = atoi(argv[3]);
-    PLS_Model plsm(X, Y, ncomp, KERNEL_TYPE1);
 
-    
-    // A is number of components to use
-    for (int A = 1; A<=ncomp; A++) { 
-        // How well did we do with this many components?
-        cout << A << " components\t";
-        cout << "explained variance: " << plsm.explained_variance(X, Y, A);
-        //cout << "root mean squared error of prediction (RMSEP):" << plsm.rmsep(X, Y, A) << endl;
-        cout << " SSE: " << plsm.SSE(X,Y,A) <<  endl; 
-    }
+    PLS_Model plsm(X, Y, ncomp);
 
-    
+    plsm.explained_variance(X, Y, ncomp);
+        
     cout << "Validation (loo):\n";
     //Mat2D looSSE = plsm.loo_validation(X, Y, PRESS);
     //cout << looSSE << endl;

@@ -1,7 +1,7 @@
-
 #include "pls.h"
 #include <cmath> // log10, ceil
 #include <iomanip> // setw
+#include <random> // mt19937
 
 namespace PLS {
     
@@ -77,6 +77,8 @@ namespace PLS {
         return colwise_z_scores(mat, means, stdev);
     };
 };
+
+using namespace PLS;
 
 /*
  *   Variable definitions from source paper:
@@ -189,6 +191,23 @@ float_type wilcoxon(const Col & err_1, const Col & err_2) {
 
     return probw;
 };
+
+// creates index vectors for partitioning Eigen::Mat2Ds
+// n == sample.size() + complement.size(); k = sample.size()
+// full = initially, an iota(0 => n-1); shuffled over and over
+// the sample & complement vectors are overwritten with
+// new index partition each call
+void rand_nchoosek(
+    std::mt19937 & rng,
+    vector<size_t> & full,
+    vector<size_t> & sample,
+    vector<size_t> & complement
+) {
+    std::shuffle(full.begin(), full.end(), rng);
+    std::copy(full.begin(), full.begin() + sample.size(), sample.begin());
+    std::copy(full.begin() + sample.size(), full.end(), complement().begin());
+}
+
 
 // TODO: several of the loop constructs seem ripe for row/col-wise operations / broadcasting:
 // https://eigen.tuxfamily.org/dox/group__TutorialReductionsVisitorsBroadcasting.html
@@ -317,6 +336,35 @@ Mat2D PLS_Model::loo_validation(const Mat2D& X, const Mat2D& Y, const VALIDATION
     }
 };
 
+// leave-some-out validation of model (i.e., are we overfitting?)
+Mat2D lso_validation(const Mat2D& X, const Mat2D& Y, VALIDATION_OUTPUT out_type, float test_fraction, int num_trials) { 
+    const std::vector<Mat2D> Ev = _lso_cv_residual_matrix(X, Y, test_fraction, num_trials);
+    assert(Ev.size() > 0);
+    const int num_residuals = Ev[0].rows();
+    Mat2D SSEv = Mat2D::Zero(Y.cols(), this->A);
+
+    for (int j = 0; j < this->A; j++) {
+        Mat2D res = Ev[j];
+        // square all of the residuals
+        Mat2D SE  = res.cwiseProduct(res);
+        // rows in SSEv correspond to different parameters
+        // Collapse the squared errors so that we're summing over all predicted rows
+        // then transpose, so that rows now represent different parameters
+        SSEv.col(j) += SE.colwise().sum().transpose();
+    }
+    if ( out_type == PRESS ) {
+        return SSEv;
+    } else {
+        SSEv /= num_residuals;
+        if ( out_type == MSEP ) { 
+            return SSEv;
+        } else {
+            // RMSEP
+            return SSEv.cwiseSqrt();
+        }
+    }
+}
+    
 
 std::vector<Mat2D> PLS_Model::_loo_cv_error_matrix(const Mat2D& X, const Mat2D& Y) const {
     Mat2D Xv = X.bottomRows(X.rows()-1);
@@ -327,17 +375,54 @@ std::vector<Mat2D> PLS_Model::_loo_cv_error_matrix(const Mat2D& X, const Mat2D& 
     std::vector<Mat2D> Ev(Y.cols(), Mat2D::Zero(X.rows(), this->A));
 
     PLS_Model plsm_v(Xv.cols(), Yv.cols(), this->A);
-    for (size_t i = 0; i < static_cast<size_t>(X.rows()); i++) {
+    for (size_t row_out = 0; row_out < static_cast<size_t>(X.rows()); row_out++) {
         plsm_v.plsr(Xv, Yv, this->method);
-        for (size_t j = 1; j <= this->A; j++) {
-            Row res = plsm_v.residuals(X.row(i), Y.row(i), j).row(0);
-            for (int k = 0; k < res.size(); k++) Ev[k](i,j-1) = res(k);
+        for (size_t num_comps = 1; num_comps <= this->A; num_comps++) {
+            Row res = plsm_v.residuals(X.row(row_out), Y.row(row_out), num_comps).row(0);
+            for (int k = 0; k < res.size(); k++) Ev[k](row_out, num_comps-1) = res(k);
         }
-        if (i < static_cast<size_t>(Xv.rows())) {
-            Xv.row(i) = X.row(i);
-            Yv.row(i) = Y.row(i);
+        // if not on the last row, swap which row is being left out
+        if (row_out < static_cast<size_t>(Xv.rows())) {
+            Xv.row(row_out) = X.row(row_out);
+            Yv.row(row_out) = Y.row(row_out);
         }
     }
+    return Ev;
+};
+
+std::vector<Mat2D> PLS_model::_lso_cv_error_matrix(
+    const Mat2D & X, const Mat2D & Y, const float_type test_fraction, const size_t num_trials,
+    std::mt19937 & rng
+) const {
+    const size_t N = X.rows();
+    const size_t test_size = static_cast<size_t>(test_fraction * N + 0.5);
+    const size_t train_size = N - test_size;
+
+    std::vector<Mat2D> Ev(A, Mat2D::Zero(num_trials*test_size, Y.cols()));
+    std::vector<size_t> sample(train_size);
+    std::vector<size_t> complement(test_size);
+    std::vector<size_t> full(sample.size() + complement.size());
+    std::iota(full.begin(), full.end(), 0);
+
+    Mat2D Xv(train_size, X.cols()); // values we're training on
+    Mat2D Yv(train_size, Y.cols());
+    Mat2D Xp(test_size, X.cols());  // values we're predicting
+    Mat2D Yp(test_size, Y.cols());
+
+    PLS_Model plsm_v(Xv.cols(), Yv.cols(), this->A);
+    for (size_t rep = 0; rep < num_trials; ++rep) {
+        rand_nchoosek(rng, full, sample, complement);
+        Xv = X(sample, Eigen::placeholders::all);
+        Yv = Y(sample, Eigen::placeholders::all);
+        Xp = X(complement, Eigen::placeholders::all);
+        Yp = Y(complement, Eigen::placeholders::all);
+        plsm_v.plsr(Xv, Yv, this->algorithm);
+        for (size_t num_comps = 1; num_comps <= this->A; num_comps++) {
+            Mat2D res = plsm_v.residuals(Xp, Yp, num_comps);
+            Ev[num_comps - 1].middleRows(rep*test_size, test_size) = res; // write to submatrix; middleRows(startRow, numRows)
+        }
+    }
+
     return Ev;
 };
 
@@ -356,15 +441,25 @@ std::vector<Mat2D> PLS_Model::_new_data_cv_error_matrix(const Mat2D& X_new, cons
 };
 
 // if val_method is LOO, X and Y should be original data
-// if val_method is NEW_DATA, X and Y should be observations not included in the original model
-const Rowsz PLS_Model::optimal_num_components(const Mat2D& X, const Mat2D& Y, const VALIDATION_METHOD val_method) const {
+// if ... is NEW_DATA, X and Y should be observations not included in the original model
+// if ... is LSO, X and Y should be original data, and test_fraction and num_trials
+// must be supplied
+const Rowsz PLS_Model::optimal_num_components(
+    const Mat2D& X, const Mat2D& Y, const VALIDATION_METHOD val_method,
+    const float_type test_fraction, const size_t num_trials,
+    mt19937 & rng
+) const {
+    assert((val_method != LSO) or ((num_trials > 0) and (0.0 < test_fraction) and (test_fraction < 1.0)));
     // col = component #, row = obs #, tier = Y category
 
     std::vector<Mat2D> errors;
-    if (val_method == LOO) {
-        errors = _loo_cv_error_matrix(X, Y);
-    } else {
-        errors = _new_data_cv_error_matrix(X, Y);
+    switch(val_method) {
+        case LOO: errors = _loo_cv_error_matrix(X, Y); break;
+        case NEW_DATA: errors = _new_data_error_matrix(X, Y); break;
+        case LSO: errors = _lso_cv_error_matrix(X, Y, test_fraction, num_trials, rng);
+        default:
+            std::cerr << "Validation method " << val_method << " not supported. " << std::endl;
+            exit(-1);
     }
 
     Mat2D press = Mat2D::Zero(Y.cols(), A);
@@ -441,18 +536,17 @@ void PLS_Model::print_model_assessment(
 void PLS_Model::print_validation(
     const Mat2D & X, const Mat2D & Y,
     const size_t training_size, const size_t testing_size,
-    const size_t optimal_components, const size_t used_components,
     std::ostream& os
 ) {
-    os << "Validation (loo):" << std::endl;
+    os << "Leave-one-out validation:" << std::endl;
     Mat2D looRMSEP = plsm.loo_validation(X, Y, RMSEP);
-    os << looRMSEP << std::endl;
+    os << "RMSE Matrix:" << std::endl << looRMSEP << std::endl;
+    os << "Optimal number of components:\t" << plsm.loo_optimal_num_components(X, Y) << std::endl;
 
     os << "Validation (lso):" << std::endl;
     Mat2D lsoRMSEP = plsm.lso_validation(X, Y, RMSEP, 0.3, 10*X.rows());
     os << lsoRMSEP << std::endl;
     
-    os << "Optimal number of components (loo):\t" << plsm.loo_optimal_num_components(X,Y) << std::endl;
-    os << "Optimal number of components (lso):\t" << plsm.lso_optimal_num_components(X,Y,0.3,10*X.rows()) << std::endl;
+    os << "Optimal number of components (lso):\t" << plsm.lso_optimal_num_components(X, Y, 0.3, 10*X.rows()) << std::endl;
 
 }    

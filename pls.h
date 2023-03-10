@@ -106,8 +106,8 @@ inline EIGENTYPE to_evector(const std::vector<float_type> & data) {
 
 namespace PLS {
     // input helper functions
-    std::vector<string> split(const std::string & s, const char separator = ',');
-    Mat2D read_matrix_file(const string & filename, const char sep, const bool verbose = false, std::ostream & os = std::cerr);
+    std::vector<std::string> split(const std::string & s, const char separator = ',');
+    Mat2D read_matrix_file(const std::string & filename, const char sep, const bool verbose = false, std::ostream & os = std::cerr);
 
     // PLS common functions
     Row colwise_stdev(const Mat2D & mat, const Row & means);
@@ -185,13 +185,15 @@ struct PLS_Model {
     Mat2D lso_validation(const Mat2D& X, const Mat2D& Y, const VALIDATION_OUTPUT out_type, const float_type test_fraction, const size_t num_trials);
 
     std::vector<Mat2D> _loo_cv_error_matrix(const Mat2D& X, const Mat2D& Y) const;
-    std::vector<Mat2D> _lso_cv_error_matrix(const Mat2D& X, const Mat2D& Y) const;
+    std::vector<Mat2D> _lso_cv_error_matrix(const Mat2D& X, const Mat2D& Y, const float_type test_fraction, const size_t num_trials) const;
     std::vector<Mat2D> _new_data_cv_error_matrix(const Mat2D& X_new, const Mat2D& Y_new) const;
 
     // if val_method is LOO, X and Y should be original data
     // if val_method is NEW_DATA, X and Y should be observations not included in the original model
     const Rowsz optimal_num_components(
-        const Mat2D& X, const Mat2D& Y, const VALIDATION_METHOD val_method
+        const Mat2D& X, const Mat2D& Y, const VALIDATION_METHOD val_method,
+        const float_type test_fraction = 0, const size_t num_trials = 0,
+        mt19937 & rng // TODO pass a null here by default
     ) const;
 
     // output methods
@@ -202,6 +204,13 @@ struct PLS_Model {
         const size_t training_size, const size_t testing_size,
         const size_t optimal_components, const size_t used_components,
         std::ostream& os = std::cerr
+    ) const;
+
+    void print_validation(
+        const Mat2D & X, const Mat2D & Y,
+        const size_t training_size, const size_t testing_size,
+        const size_t optimal_components, const size_t used_components,
+        std::ostream& os
     ) const;
 
     private:

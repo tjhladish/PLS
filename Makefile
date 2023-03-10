@@ -5,7 +5,7 @@ MPRSUP ?= #-DMPREAL_SUPPORT
 LIBMPR ?= #-lmpfr
 
 pls.o: pls.cpp pls.h
-	$(CPP) $(CFLAGS) -c -I. $(MPRSUP) $< -o $@ $(LIBMPR)
+	$(CPP) $(CFLAGS) -c -I. -Ieigen $(MPRSUP) $< -o $@ $(LIBMPR)
 
 pls: pls_main.cpp pls.o
 	$(CPP) $(CFLAGS) $< -o $@

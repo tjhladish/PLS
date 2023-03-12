@@ -1,7 +1,21 @@
-C++ implementation of partial least squares regression using Eigen.
+# Partial Least Squares (PLS) regression in C++, using Eigen.
+
+## Quick Start
+
+1. clone the repository, as its own project or as submodule
+2. build the library: navigate to project folder and `make` it
+3. in whatever other code will be incorporating it, add include path to PLS (and potentially Eigen)
+
+## Contributing
+
+See our [contributing guidelines](CONTRIBUTING.md).
+
+## Copyright
 
 Authors: Thomas Hladish, Eugene Melamud
 Copyright 2012, 2013, 2014 Thomas Hladish, Eugene Melamud
+
+## License
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

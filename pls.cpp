@@ -407,6 +407,7 @@ const Row PLS_Model::explained_variance(
     ).matrix(); // 1 - SSE/SST, using eigen broadcasting
 }
 
+// template specialization for LOO error
 template <>
 PLSError PLS_Model::error<PLS::LOO>(
     const Mat2D & X, const Mat2D & Y
@@ -434,6 +435,7 @@ PLSError PLS_Model::error<PLS::LOO>(
     return Ev;
 };
 
+// template specialization for NEW_DATA error
 template <>
 PLSError PLS_Model::error<PLS::NEW_DATA>(
     const Mat2D & X, const Mat2D & Y
@@ -452,7 +454,8 @@ PLSError PLS_Model::error<PLS::NEW_DATA>(
     return Ev;
 };
 
-template<>
+// template specialization for LSO error
+template <>
 PLSError PLS_Model::error<PLS::LSO>(
     const Mat2D & X, const Mat2D & Y,
     const float_type test_fraction, const size_t num_trials, std::mt19937 & rng
@@ -491,6 +494,28 @@ PLSError PLS_Model::error<PLS::LSO>(
 
     return Ev;
 };
+
+// template generalization for not LOO/NEW_DATA error methods - just fail
+// TODO figure out how to make this a compile error / warning
+template <PLS::VALIDATION_METHOD val_method>
+PLSError PLS_Model::error(
+    const Mat2D& X, const Mat2D& Y
+) const {
+    std::cerr << "error<" << val_method <<"> must be provided additional arguments." << std::endl;
+    exit(-1);
+}
+
+// template generalization for not LSO error methods - just fail
+// TODO figure out how to make this a compile error / warning
+template <PLS::VALIDATION_METHOD val_method>
+PLSError PLS_Model::error(
+    const Mat2D& X, const Mat2D& Y,
+    const float_type test_fraction, const size_t num_trials, std::mt19937 & rng
+) const {
+    std::cerr << "error<" << val_method <<"> provided too many arguments." << std::endl;
+    exit(-1);
+}
+
 
 void PLS_Model::print_explained_variance(
     const Mat2D& X, const Mat2D& Y, std::ostream& os

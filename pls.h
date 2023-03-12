@@ -244,19 +244,13 @@ struct PLS_Model {
     template <PLS::VALIDATION_METHOD val_method>
     PLSError error(
         const Mat2D& X, const Mat2D& Y
-    ) const {
-        std::cerr << "error<" << val_method <<"> must be provided additional arguments." << std::endl;
-        exit(-1);
-    }
+    ) const;
 
     template <PLS::VALIDATION_METHOD val_method>
     PLSError error(
         const Mat2D& X, const Mat2D& Y,
         const float_type test_fraction, const size_t num_trials, std::mt19937 & rng
-    ) const {
-        std::cerr << "error<" << val_method <<"> provided too many arguments." << std::endl;
-        exit(-1);
-    }
+    ) const;
 
     // output methods
     void print_explained_variance(

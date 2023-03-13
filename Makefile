@@ -6,11 +6,11 @@ LIBMPR ?= #-lmpfr
 
 ARCHIVE ?= $(AR) -rv
 
-pls.o: pls.cpp pls.h
-	$(CPP) $(CFLAGS) -c -I. -Ieigen $(MPRSUP) $< -o $@ $(LIBMPR)
-
 libpls.a: pls.o
 	$(ARCHIVE) $@ $^
+
+pls.o: pls.cpp pls.h
+	$(CPP) $(CFLAGS) -c -I. -Ieigen $(MPRSUP) $< -o $@ $(LIBMPR)
 
 pls: pls_main.cpp libpls.a
 	$(CPP) $(CFLAGS) -I. -Ieigen -o $@ $< -L. -lpls $(LIBMPR)

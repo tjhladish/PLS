@@ -7,7 +7,7 @@ set( CMAKE_CXX_FLAGS "-Wall -Wpedantic -O2 -fPIC" )
 
 include_directories( include lib/eigen )
 
-add_executable( PLS main.cpp )
+add_executable( PLS src/main.cpp )
 
 add_library( pls STATIC src/pls.cpp )
 target_link_libraries( PLS pls )

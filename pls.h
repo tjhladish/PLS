@@ -86,6 +86,8 @@ namespace PLS {
     // for calculating the stdev by column (mean calculated)
     Row colwise_stdev(const Mat2D & mat);
 
+    Row z_scores(const Row & obs, const Row & mean, const Row & stdev);
+
     // for converting a matrix to z-scores by column (mean, stdev specified)
     Mat2D colwise_z_scores(const Mat2D & mat, const Row & mean, const Row & stdev);
     // for converting a matrix to z-scores by column (mean, stdev calculated)

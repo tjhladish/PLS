@@ -1,3 +1,8 @@
-pls.o
-pls
+PLS
 libpls.a
+CMakeCache.txt
+CMakeFiles
+build
+.vscode
+cmake_install.cmake
+Makefile

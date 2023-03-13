@@ -74,6 +74,10 @@ namespace PLS {
         return colwise_stdev(mat, mat.colwise().mean());
     }
 
+    Row z_scores(const Row & obs, const Row & mean, const Row & stdev) {
+        return (obs - mean).array() / stdev.array();
+    }
+
     Mat2D colwise_z_scores(const Mat2D & mat, const Row & mean, const Row & stdev) {
         Row local_sd = stdev;
         // sd == 0 => implies all values the same => x_i - mean == 0

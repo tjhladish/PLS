@@ -17,6 +17,7 @@ git submodule add git@github.com:tjhladish/PLS.git # get the repository
 Then
 
 ```
+cd PLS                                     # enter newly created project / submodule directory
 git submodule update --init --recursive    # pull down the associated submodules (Eigen)
 cmake -S . -B build                        # setup build folder
 cd build                                   # enter build folder

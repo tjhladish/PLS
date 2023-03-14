@@ -3,7 +3,7 @@
 #include <random>
 #include <iostream>
 
-#include "pls.h"
+#include <pls/pls.h>
 
 using namespace PLS;
 

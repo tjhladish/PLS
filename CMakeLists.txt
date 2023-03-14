@@ -11,6 +11,3 @@ add_executable( PLS src/main.cpp )
 
 add_library( pls STATIC src/pls.cpp )
 target_link_libraries( PLS pls )
-
-find_package (Eigen3 3.4.90 REQUIRED NO_MODULE)
-target_link_libraries (PLS Eigen3::Eigen)

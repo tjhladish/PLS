@@ -2,9 +2,27 @@
 
 ## Quick Start
 
-1. clone the repository, as its own project or as submodule
-2. build the library: navigate to project folder, `cmake .; make pls` it
-3. in whatever other code will be incorporating it, add the relevant cmake pathing to find it
+From a generic overall projects root folder:
+
+```
+git clone git@github.com:tjhladish/PLS.git         # get the repository
+```
+
+As a submodule within another project, navigate to where you'll be collecting libraries (e.g. `lib`, `libs`, `external`), then:
+
+```
+git submodule add git@github.com:tjhladish/PLS.git # get the repository
+```
+
+Then
+
+```
+git submodule update --init --recursive    # pull down the associated submodules (Eigen)
+cmake -S . -B build                        # setup build folder
+cd build                                   # enter build folder
+make pls PLS                               # make the library & executable
+./PLS ../toyX.csv ../toyY.csv 2            # test executable
+```
 
 ## Contributing
 

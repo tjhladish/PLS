@@ -2,7 +2,7 @@
 #include <cmath> // log10, ceil
 #include <iomanip> // setw
 #include <random> // mt19937
-#include "pls.h"
+#include <pls/pls.h>
 
 using namespace PLS;
 

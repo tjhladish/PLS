@@ -2,12 +2,23 @@
 #include <cmath> // log10, ceil
 #include <iomanip> // setw
 #include <random> // mt19937
+#include <Eigen/Dense> // Matrix methods
+#include <Eigen/Eigenvalues> // EigenSolver
 #include <PLS/pls.h>
-
-using namespace PLS;
 
 namespace PLS {
     
+    // given an EigenSolver object, returns the index of the dominant eigenvalue
+    // (used internally in dominant_eigen(value|vector))
+    template<typename MATTYPE>
+    size_t find_dominant_ev(const Eigen::EigenSolver<MATTYPE> & es);
+
+    // returns the dominant (real-valued) eigenvalue
+    float_type dominant_eigenvalue(const Eigen::EigenSolver<Mat2Dc> & es);
+
+    // returns the dominant eigenvector (possibly complex-valued)
+    Colc dominant_eigenvector(const Eigen::EigenSolver<Mat2D> & es);
+
     std::vector<std::string> split(const std::string & s, const char separator) {
         size_t i = 0;
         size_t j = s.find(separator);
@@ -99,7 +110,7 @@ namespace PLS {
     };
 
     template<typename MATTYPE>
-    size_t find_dominant_ev(const EigenSolver<MATTYPE> & es) {
+    size_t find_dominant_ev(const Eigen::EigenSolver<MATTYPE> & es) {
         auto eig_val = es.eigenvalues();
         float_type m = 0;
         size_t idx = 0;
@@ -117,13 +128,13 @@ namespace PLS {
     }
 
     // extract the dominant eigenvalue from EigenSolver
-    float_type dominant_eigenvalue(const EigenSolver<Mat2Dc> & es) {
+    float_type dominant_eigenvalue(const Eigen::EigenSolver<Mat2Dc> & es) {
         const size_t idx = find_dominant_ev(es);
         return abs(es.eigenvalues()[idx].real());
     };
 
     // extract the dominant eigenvector from EigenSolver
-    Colc dominant_eigenvector(const EigenSolver<Mat2D> & es) {
+    Colc dominant_eigenvector(const Eigen::EigenSolver<Mat2D> & es) {
         const size_t idx = find_dominant_ev(es);
         return es.eigenvectors().col(idx);
     };
@@ -221,8 +232,8 @@ namespace PLS {
     // out_type: how to summarize the errors
     // return: a matrix, rows = Y-components, cols = num of components, coefficients = summarized error
     Mat2D validation(
-        const PLSError & errors,
-        const PLS::VALIDATION_OUTPUT out_type
+        const Residual & errors,
+        const VALIDATION_OUTPUT out_type
     ) {
         if (errors.size() == 0) { return Mat2D::Zero(0, 0); }
         // sum-of-squared error, for each Y component (rows), for 1-to-A components (cols)
@@ -250,7 +261,7 @@ namespace PLS {
     // return: a row, columns correspondings to columns in Y (used in error(X, Y, ...))
     // each row_i = the optimal number of components to impute a row_i
     Colsz optimal_num_components(
-        const PLSError & errors,
+        const Residual & errors,
         const float_type ALPHA
     ) {
         // rows = Y component, cols = # of components
@@ -275,9 +286,9 @@ namespace PLS {
     };
 
     void print_validation(
-        const PLSError & errors,
-        const PLS::VALIDATION_METHOD method,
-        const PLS::VALIDATION_OUTPUT out_type,
+        const Residual & errors,
+        const VALIDATION_METHOD method,
+        const VALIDATION_OUTPUT out_type,
         std::ostream& os
     ) {
         switch (method) {
@@ -298,6 +309,29 @@ namespace PLS {
     };
 
 };
+
+using namespace PLS;
+
+// use when expecting to re-apply plsr repeatedly to new data of the same shape
+Model::Model(
+    const size_t num_predictors, const size_t num_responses, const size_t num_components
+) : A(num_components) {
+    P.setZero(num_predictors, A);
+    W.setZero(num_predictors, A);
+    R.setZero(num_predictors, A);
+    Q.setZero(num_responses, A);
+    // T will be initialized if needed
+}
+
+// use for a one-off PLSR
+Model::Model(
+    const Mat2D& X, const Mat2D& Y,
+    const size_t num_components,
+    const PLS::METHOD algorithm
+) : Model(X.cols(), Y.cols(), num_components) {
+    method = algorithm;
+    plsr(X, Y, algorithm);
+}
 
 /*
  *   Variable definitions from source paper:
@@ -321,15 +355,13 @@ namespace PLS {
  *     a     : integer counter for latent variable dimension
  */
 
-
-
 // TODO: several of the loop constructs seem ripe for row/col-wise operations / broadcasting:
 // https://eigen.tuxfamily.org/dox/group__TutorialReductionsVisitorsBroadcasting.html
 
 
 // "Modified kernel algorithms 1 and 2"
 // from Dayal and MacGregor (1997) "Improved PLS Algorithms" J. of Chemometrics. 11,73-85.
-PLS_Model& PLS_Model::plsr(const Mat2D& X, const Mat2D& Y, const METHOD algorithm) {
+Model& Model::plsr(const Mat2D& X, const Mat2D& Y, const METHOD algorithm) {
     method = algorithm;
     int M = Y.cols(); // Number of response variables == columns in Y
 
@@ -341,11 +373,11 @@ PLS_Model& PLS_Model::plsr(const Mat2D& X, const Mat2D& Y, const METHOD algorith
 
     for (size_t i = 0; i < A; i++) {
         Colc w, p, q, r, t;
-        complex<float_type> tt;
+        std::complex<float_type> tt;
         if (M == 1) {
-            w = XY.cast<complex<float_type> >();
+            w = XY.cast<std::complex<float_type>>();
         } else {
-            EigenSolver<Mat2D> es( (XY.transpose() * XY) );
+            Eigen::EigenSolver<Mat2D> es( (XY.transpose() * XY) );
             q = dominant_eigenvector(es);
             w = (XY*q);
         }
@@ -381,29 +413,29 @@ PLS_Model& PLS_Model::plsr(const Mat2D& X, const Mat2D& Y, const METHOD algorith
     return *this;
 };
 
-const Mat2Dc PLS_Model::scores(const Mat2D& X_new, const size_t comp) const {
+const Mat2Dc Model::scores(const Mat2D& X_new, const size_t comp) const {
     assert (A >= comp);
     return X_new * R.leftCols(comp);
 };
 
-const Mat2Dc PLS_Model::coefficients(const size_t comp) const {
+const Mat2Dc Model::coefficients(const size_t comp) const {
     assert (A >= comp);
     return R.leftCols(comp)*Q.leftCols(comp).transpose();
 };
 
-const Mat2D PLS_Model::fitted_values(const Mat2D& X, const size_t comp) const {
+const Mat2D Model::fitted_values(const Mat2D& X, const size_t comp) const {
     return X*coefficients(comp).real();
 };
 
-const Mat2D PLS_Model::residuals(const Mat2D& X, const Mat2D& Y, const size_t comp) const {
+const Mat2D Model::residuals(const Mat2D& X, const Mat2D& Y, const size_t comp) const {
     return Y - fitted_values(X, comp);
 };
 
-const Row PLS_Model::SSE(const Mat2D& X, const Mat2D& Y, const size_t comp) const {
+const Row Model::SSE(const Mat2D& X, const Mat2D& Y, const size_t comp) const {
     return residuals(X, Y, comp).colwise().squaredNorm();
 };
 
-const Row PLS_Model::explained_variance(
+const Row Model::explained_variance(
     const Mat2D& X, const Mat2D& Y, const size_t comp
 ) const {
     return (
@@ -413,7 +445,7 @@ const Row PLS_Model::explained_variance(
 
 // template specialization for LOO error
 template <>
-PLSError PLS_Model::error<PLS::LOO>(
+Residual Model::error<PLS::LOO>(
     const Mat2D & X, const Mat2D & Y
 ) const {
     Mat2D Xv = X.bottomRows(X.rows()-1);
@@ -421,9 +453,9 @@ PLSError PLS_Model::error<PLS::LOO>(
 
     // vector of error matrices(rows=Y.rows(), cols=Y.cols())
     // col = component #, row = obs #, tier = Y category
-    PLSError Ev(Y.cols(), Mat2D::Zero(X.rows(), this->A));
+    Residual Ev(Y.cols(), Mat2D::Zero(X.rows(), this->A));
 
-    PLS_Model plsm_v(Xv.cols(), Yv.cols(), this->A);
+    Model plsm_v(Xv.cols(), Yv.cols(), this->A);
     for (size_t row_out = 0; row_out < static_cast<size_t>(X.rows()); row_out++) {
         plsm_v.plsr(Xv, Yv, this->method);
         for (size_t num_comps = 1; num_comps <= this->A; num_comps++) {
@@ -441,12 +473,12 @@ PLSError PLS_Model::error<PLS::LOO>(
 
 // template specialization for NEW_DATA error
 template <>
-PLSError PLS_Model::error<PLS::NEW_DATA>(
+Residual Model::error<PLS::NEW_DATA>(
     const Mat2D & X, const Mat2D & Y
 ) const {
     // vector of error matrices(rows=Y.rows(), cols=Y.cols())
     // col = component #, row = obs #, tier = Y category
-    PLSError Ev(Y.cols(), Mat2D::Zero(X.rows(), this->A));
+    Residual Ev(Y.cols(), Mat2D::Zero(X.rows(), this->A));
 
     for (size_t num_comps = 1; num_comps <= this->A; num_comps++) { // j is component #
         Mat2D res = residuals(X, Y, num_comps);
@@ -460,7 +492,7 @@ PLSError PLS_Model::error<PLS::NEW_DATA>(
 
 // template specialization for LSO error
 template <>
-PLSError PLS_Model::error<PLS::LSO>(
+Residual Model::error<PLS::LSO>(
     const Mat2D & X, const Mat2D & Y,
     const float_type test_fraction, const size_t num_trials, std::mt19937 & rng
 ) const {
@@ -468,7 +500,7 @@ PLSError PLS_Model::error<PLS::LSO>(
     const size_t test_size = static_cast<size_t>(test_fraction * N + 0.5);
     const size_t train_size = N - test_size;
 
-    PLSError Ev(Y.cols(), Mat2D::Zero(num_trials*test_size, A));
+    Residual Ev(Y.cols(), Mat2D::Zero(num_trials*test_size, A));
 
     std::vector<Eigen::Index> sample(train_size);
     std::vector<Eigen::Index> complement(test_size);
@@ -480,7 +512,7 @@ PLSError PLS_Model::error<PLS::LSO>(
     Mat2D Xp(test_size, X.cols());  // values we're predicting
     Mat2D Yp(test_size, Y.cols());
 
-    PLS_Model plsm_v(Xv.cols(), Yv.cols(), this->A);
+    Model plsm_v(Xv.cols(), Yv.cols(), this->A);
     for (size_t rep = 0; rep < num_trials; ++rep) {
         rand_nchoosek(rng, full, sample, complement);
         Xv = X(sample, Eigen::placeholders::all);
@@ -502,7 +534,7 @@ PLSError PLS_Model::error<PLS::LSO>(
 // template generalization for not LOO/NEW_DATA error methods - just fail
 // TODO figure out how to make this a compile error / warning
 template <PLS::VALIDATION_METHOD val_method>
-PLSError PLS_Model::error(
+Residual Model::error(
     const Mat2D& X, const Mat2D& Y
 ) const {
     std::cerr << "error<" << val_method <<"> must be provided additional arguments." << std::endl;
@@ -512,7 +544,7 @@ PLSError PLS_Model::error(
 // template generalization for not LSO error methods - just fail
 // TODO figure out how to make this a compile error / warning
 template <PLS::VALIDATION_METHOD val_method>
-PLSError PLS_Model::error(
+Residual Model::error(
     const Mat2D& X, const Mat2D& Y,
     const float_type test_fraction, const size_t num_trials, std::mt19937 & rng
 ) const {
@@ -521,7 +553,7 @@ PLSError PLS_Model::error(
 }
 
 
-void PLS_Model::print_explained_variance(
+void Model::print_explained_variance(
     const Mat2D& X, const Mat2D& Y, std::ostream& os
 ) const {
     const size_t wd = ceil(std::log10(A));
@@ -534,7 +566,7 @@ void PLS_Model::print_explained_variance(
     }
 };
 
-void PLS_Model::print_state(std::ostream& os) const {
+void Model::print_state(std::ostream& os) const {
     //P, W, R, Q, T
     os <<
         "P:"   << std::endl <<

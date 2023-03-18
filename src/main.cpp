@@ -26,18 +26,18 @@ int main(int argc, char *argv[]) {
 
     int ncomp = atoi(argv[3]);
 
-    PLS_Model plsm(X, Y, ncomp);
+    Model plsm(X, Y, ncomp);
 
     plsm.print_state();
 
     plsm.print_explained_variance(X, Y);
     
-    PLSError looerror = plsm.error<LOO>(X, Y);
+    Residual looerror = plsm.error<LOO>(X, Y);
     print_validation(looerror, LOO, MSE);
 
     std::mt19937 rng;
 
-    PLSError lsoerror = plsm.error<LSO>(X, Y, 0.3, 10*X.rows(), rng);
+    Residual lsoerror = plsm.error<LSO>(X, Y, 0.3, 10*X.rows(), rng);
     print_validation(lsoerror, LSO, MSE);
 
     return 0;

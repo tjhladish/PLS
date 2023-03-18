@@ -1,37 +1,17 @@
 #ifndef PLS_H
 #define PLS_H
 
-#include <Eigen/Eigenvalues>
+#include <PLS/TypeDefs.h>
 #include <vector>
 #include <iostream> // for ostream
 #include <random> // for std::mt19937
 #include <algorithm> // sort
 #include <numeric> // iota
 
-#ifdef MPREAL_SUPPORT
-#include "mpreal.h"
-#include <unsupported/Eigen/MPRealSupport>
-    using namespace mpfr;
-    typedef mpreal float_type;
-#else
-    typedef double float_type;
-#endif
-
 //using namespace std;
 using namespace Eigen;
 
 using std::complex;
-
-typedef Matrix<float_type, Dynamic, Dynamic> Mat2D;
-typedef Matrix<float_type, Dynamic, 1>  Col;
-typedef Matrix<int, Dynamic, 1>  Coli;
-typedef Matrix<size_t, Dynamic, 1>  Colsz;
-typedef Matrix<float_type, 1, Dynamic>  Row;
-typedef Matrix<int, 1, Dynamic>  Rowi;
-typedef Matrix<size_t, 1, Dynamic>  Rowsz;
-typedef Matrix<complex<float_type>, Dynamic, Dynamic> Mat2Dc;
-typedef Matrix<complex<float_type>, Dynamic, 1>  Colc;
-typedef std::vector<Mat2D> PLSError;
 
 namespace PLS {
 
@@ -92,17 +72,6 @@ namespace PLS {
     Mat2D colwise_z_scores(const Mat2D & mat, const Row & mean, const Row & stdev);
     // for converting a matrix to z-scores by column (mean, stdev calculated)
     Mat2D colwise_z_scores(const Mat2D & mat);
-
-    // given an EigenSolver object, returns the index of the dominant eigenvalue
-    // (used internally in dominant_eigen(value|vector))
-    template<typename MATTYPE>
-    size_t find_dominant_ev(const EigenSolver<MATTYPE> & es);
-
-    // returns the dominant (real-valued) eigenvalue
-    float_type dominant_eigenvalue(const EigenSolver<Mat2Dc> & es);
-
-    // returns the dominant eigenvector (possibly complex-valued)
-    Colc dominant_eigenvector(const EigenSolver<Mat2D> & es);
 
     // empirical approximation of the normalCDF
     float_type normalcdf(const float_type z);
@@ -191,23 +160,14 @@ struct PLS_Model {
     // use when expecting to re-apply plsr repeatedly to new data of the same shape
     PLS_Model(
       const size_t num_predictors, const size_t num_responses, const size_t num_components
-    ) : A(num_components) {
-        P.setZero(num_predictors, A);
-        W.setZero(num_predictors, A);
-        R.setZero(num_predictors, A);
-        Q.setZero(num_responses, A);
-        // T will be initialized if needed
-    }
+    );
 
     // use for a one-off PLSR
     PLS_Model(
         const Mat2D& X, const Mat2D& Y,
         const size_t num_components,
         const PLS::METHOD algorithm = PLS::KERNEL_TYPE1
-    ) : PLS_Model(X.cols(), Y.cols(), num_components) {
-        method = algorithm;
-        plsr(X, Y, algorithm);
-    }
+    );
 
     // Transforms X_new into the latent space of the PLS model
     // i.e. the orthogonal X you wish you could measure

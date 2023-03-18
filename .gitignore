@@ -1,4 +1,5 @@
 PLS
+!include/PLS
 libpls.a
 CMakeCache.txt
 CMakeFiles

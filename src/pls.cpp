@@ -2,12 +2,23 @@
 #include <cmath> // log10, ceil
 #include <iomanip> // setw
 #include <random> // mt19937
+#include <Eigen/Dense> // Matrix methods
+#include <Eigen/Eigenvalues> // EigenSolver
 #include <PLS/pls.h>
-
-using namespace PLS;
 
 namespace PLS {
     
+    // given an EigenSolver object, returns the index of the dominant eigenvalue
+    // (used internally in dominant_eigen(value|vector))
+    template<typename MATTYPE>
+    size_t find_dominant_ev(const EigenSolver<MATTYPE> & es);
+
+    // returns the dominant (real-valued) eigenvalue
+    float_type dominant_eigenvalue(const EigenSolver<Mat2Dc> & es);
+
+    // returns the dominant eigenvector (possibly complex-valued)
+    Colc dominant_eigenvector(const EigenSolver<Mat2D> & es);
+
     std::vector<std::string> split(const std::string & s, const char separator) {
         size_t i = 0;
         size_t j = s.find(separator);
@@ -299,6 +310,29 @@ namespace PLS {
 
 };
 
+using namespace PLS;
+
+// use when expecting to re-apply plsr repeatedly to new data of the same shape
+PLS_Model::PLS_Model(
+    const size_t num_predictors, const size_t num_responses, const size_t num_components
+) : A(num_components) {
+    P.setZero(num_predictors, A);
+    W.setZero(num_predictors, A);
+    R.setZero(num_predictors, A);
+    Q.setZero(num_responses, A);
+    // T will be initialized if needed
+}
+
+// use for a one-off PLSR
+PLS_Model::PLS_Model(
+    const Mat2D& X, const Mat2D& Y,
+    const size_t num_components,
+    const PLS::METHOD algorithm
+) : PLS_Model(X.cols(), Y.cols(), num_components) {
+    method = algorithm;
+    plsr(X, Y, algorithm);
+}
+
 /*
  *   Variable definitions from source paper:
  *     X     : predictor variables matrix (N × K)
@@ -320,8 +354,6 @@ namespace PLS {
  *     A     : number of components in PLS model
  *     a     : integer counter for latent variable dimension
  */
-
-
 
 // TODO: several of the loop constructs seem ripe for row/col-wise operations / broadcasting:
 // https://eigen.tuxfamily.org/dox/group__TutorialReductionsVisitorsBroadcasting.html

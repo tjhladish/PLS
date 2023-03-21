@@ -1,7 +1,7 @@
 #ifndef PLS_H
 #define PLS_H
 
-#include <Eigen/Core> // only need to know that `Matrix` definition for header
+#include <Eigen/Core> // only need to know `Matrix`es exist for header
 #include <vector>
 #include <iostream> // for ostream, std::cerr
 #include <random> // for std::mt19937
@@ -13,19 +13,24 @@
 #include <unsupported/Eigen/MPRealSupport>
     using namespace mpfr;
     typedef mpreal float_type;
+    typedef Eigen::Matrix<float_type, Eigen::Dynamic, Eigen::Dynamic> Mat2D;
+    typedef Eigen::Matrix<float_type, Eigen::Dynamic, 1> Col;
+    typedef Eigen::Matrix<float_type, 1, Eigen::Dynamic> Row;
+    typedef Eigen::Matrix<std::complex<float_type>, Eigen::Dynamic, Eigen::Dynamic> Mat2Dc;
+    typedef Eigen::Matrix<std::complex<float_type>, Eigen::Dynamic, 1> Colc;
 #else
     typedef double float_type;
+    typedef Eigen::MatrixXd Mat2D;
+    typedef Eigen::VectorXd Col;
+    typedef Eigen::RowVectorXd Row;
+    typedef Eigen::MatrixXcd Mat2Dc;
+    typedef Eigen::VectorXcd Colc;
 #endif // MPREAL_SUPPORT
 
-typedef Eigen::Matrix<float_type, Eigen::Dynamic, Eigen::Dynamic> Mat2D;
-typedef Eigen::Matrix<float_type, Eigen::Dynamic, 1> Col;
-typedef Eigen::Matrix<int, Eigen::Dynamic, 1> Coli;
+typedef Eigen::VectorXi Coli;
 typedef Eigen::Matrix<size_t, Eigen::Dynamic, 1> Colsz;
-typedef Eigen::Matrix<float_type, 1, Eigen::Dynamic> Row;
-typedef Eigen::Matrix<int, 1, Eigen::Dynamic> Rowi;
+typedef Eigen::RowVectorXi Rowi;
 typedef Eigen::Matrix<size_t, 1, Eigen::Dynamic> Rowsz;
-typedef Eigen::Matrix<std::complex<float_type>, Eigen::Dynamic, Eigen::Dynamic> Mat2Dc;
-typedef Eigen::Matrix<std::complex<float_type>, Eigen::Dynamic, 1> Colc;
 
 namespace PLS {
 

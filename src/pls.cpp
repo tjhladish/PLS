@@ -2,6 +2,7 @@
 #include <cmath> // log10, ceil
 #include <iomanip> // setw
 #include <random> // mt19937
+#include <cassert> // assert
 #include <Eigen/Dense> // Matrix methods
 #include <Eigen/Eigenvalues> // EigenSolver
 #include <PLS/pls.h>

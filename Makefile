@@ -13,5 +13,5 @@ build-static: .FORCE
 	cmake --build $@
 
 install: build-static build-shared
-	cmake --install build-shared --prefix _install
-	cmake --install build-static --prefix _install
+	cmake --install build-shared
+	cmake --install build-static

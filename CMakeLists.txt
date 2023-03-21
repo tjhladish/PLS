@@ -5,7 +5,7 @@ project(PLS VERSION 2.0.0)
 # TODO figure out if this is the right way to do this
 # intend: if new enough Eigen3 is found, use it;
 # otherwise, install from submoduled source
-find_package(Eigen3 3.4.90 REQUIRED NO_MODULE)
+find_package(Eigen3 3.4.90 NO_MODULE)
 if (NOT Eigen3_FOUND)
   message(WARNING "Eigen3 3.4.90+ not found; installing from source...")
   include(FetchContent)
@@ -31,8 +31,6 @@ target_include_directories(pls PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_
 
 target_compile_features(pls PUBLIC cxx_std_20)
 
-include(GenerateExportHeader)
-generate_export_header(pls EXPORT_FILE_NAME include/PLS/export.h)
 target_compile_definitions(
     pls PUBLIC "$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:PLS_STATIC_DEFINE>")
 target_include_directories(
@@ -44,7 +42,7 @@ add_executable( PLS src/main.cpp )
 target_link_libraries( PLS pls )
 
 install(TARGETS PLS pls
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
+  RUNTIME DESTINATION bin
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib
 )

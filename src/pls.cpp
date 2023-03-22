@@ -314,23 +314,26 @@ namespace PLS {
 using namespace PLS;
 
 // use when expecting to re-apply plsr repeatedly to new data of the same shape
-Model::Model(
-    const size_t num_predictors, const size_t num_responses, const size_t num_components
-) : A(num_components) {
-    P.setZero(num_predictors, A);
-    W.setZero(num_predictors, A);
-    R.setZero(num_predictors, A);
-    Q.setZero(num_responses, A);
-    // T will be initialized if needed
-}
+// Model::Model(
+//     const size_t num_predictors, const size_t num_responses, const size_t num_components
+// ) : A(num_components) {
+//     P.setZero(num_predictors, A);
+//     W.setZero(num_predictors, A);
+//     R.setZero(num_predictors, A);
+//     Q.setZero(num_responses, A);
+//     // T will be initialized if needed
+// }
 
 // use for a one-off PLSR
 Model::Model(
     const Mat2D& X, const Mat2D& Y,
-    const size_t num_components,
     const PLS::METHOD algorithm
-) : Model(X.cols(), Y.cols(), num_components) {
-    method = algorithm;
+    const size_t num_components,
+) : X(X), Y(Y), A(num_components), method(algorithm) {
+    P.setZero(X.cols(), A);
+    W.setZero(X.cols(), A);
+    R.setZero(X.cols(), A);
+    Q.setZero(Y.cols(), A);
     plsr(X, Y, algorithm);
 }
 

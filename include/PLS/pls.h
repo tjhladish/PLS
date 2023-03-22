@@ -34,6 +34,12 @@ typedef Eigen::Matrix<size_t, 1, Eigen::Dynamic> Rowsz;
 
 namespace PLS {
 
+    // Validation methods - used in `error()` functions
+    // leave-one-out (LOO) validation;
+    // leave-some-out (LSO) validation;
+    // new data (NEW_DATA) validation
+    typedef enum { LOO, LSO, NEW_DATA } VALIDATION_METHOD;
+
     typedef std::vector<Mat2D> Residual;
 
 /* ------- Eigen-related convenience functions for PLS specific operations ------- */
@@ -126,12 +132,6 @@ namespace PLS {
     // result, by dividing by error[0].rows()
     typedef enum { RESS, MSE } VALIDATION_OUTPUT;
 
-    // Validation methods - used in `error()` functions
-    // leave-one-out (LOO) validation;
-    // leave-some-out (LSO) validation;
-    // new data (NEW_DATA) validation
-    typedef enum { LOO, LSO, NEW_DATA } VALIDATION_METHOD;
-
     Mat2D validation(
         const Residual & errors,
         const PLS::VALIDATION_OUTPUT out_type
@@ -173,11 +173,6 @@ namespace PLS {
  *     a     : integer counter for latent variable dimension
  */
 struct Model {
-
-    // use when expecting to re-apply plsr repeatedly to new data of the same shape
-    Model(
-      const size_t num_predictors, const size_t num_responses, const size_t num_components
-    );
 
     // use for a one-off PLSR
     Model(
@@ -222,13 +217,15 @@ struct Model {
     const Row explained_variance(const Mat2D& X, const Mat2D& Y, const size_t comp) const;
     const Row explained_variance(const Mat2D& X, const Mat2D& Y) const { return explained_variance(X, Y, A); }
 
-    template <PLS::VALIDATION_METHOD val_method>
-    Residual error(
+    Residual error_LOO(
         const Mat2D& X, const Mat2D& Y
     ) const;
 
-    template <PLS::VALIDATION_METHOD val_method>
-    Residual error(
+    Residual error_NEW_DATA(
+        const Mat2D& X, const Mat2D& Y
+    ) const;
+
+    Residual error_LSO(
         const Mat2D& X, const Mat2D& Y,
         const float_type test_fraction, const size_t num_trials, std::mt19937 & rng
     ) const;
@@ -241,12 +238,50 @@ struct Model {
     void print_state(std::ostream& os = std::cerr) const;
 
     private:
+        const Mat2D X, Y;
         size_t A; // number of components
         Mat2Dc P, W, R, Q, T;
         PLS::METHOD method;
 
+        // use when expecting to re-apply plsr repeatedly to new data of the same shape;
+        // i.e. when using cross-validation
+        Model(
+            const size_t num_predictors, const size_t num_responses, const size_t num_components
+        );
+
+
 };
 
+template <typename T>
+struct ResidualCalculator {
+    ResidualCalculator(const std::string & method) : method(method) {};
+    const std::string method;
+    const Residual error(const Model & plsm, const Mat2D & X, const Mat2D & Y) const {
+        return static_cast<T>(*this)->errorImpl(plsm, X, Y);
+    }
 }
+
+struct LOO : public ResidualCalculator<LOO> {
+    LOO() : ResidualCalculator<LOO>("LOO") {};
+    const Residual errorImpl(const Model & plsm, const Mat2D & X, const Mat2D & Y) const;
+}
+
+struct NEWDATA : public ResidualCalculator<NEWDATA> {
+    NEWDATA() : ResidualCalculator<NEWDATA>("NEW DATA") {};
+    const Residual errorImpl(const Model & plsm, const Mat2D & X, const Mat2D & Y) const;
+}
+
+struct LSO : public ResidualCalculator<LSO> {
+    LSO() : ResidualCalculator<LSO>("LSO") {};
+    const Residual errorImpl(const Model & plsm, const Mat2D & X, const Mat2D & Y) const;
+
+}
+
+// to add a new validation method:
+// create a new struct following the above pattern (and corresponding implementation)
+// n.b. the some validation methods require additional arguments, e.g. LSO requires
+// a test_fraction and num_trials
+
+} // namespace PLS
 
 #endif

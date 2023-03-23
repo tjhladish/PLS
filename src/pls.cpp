@@ -233,9 +233,10 @@ namespace PLS {
     // out_type: how to summarize the errors
     // return: a matrix, rows = Y-components, cols = num of components, coefficients = summarized error
     Mat2D validation(
-        const ResidualData &errors,
+        const Residual &residual,
         const VALIDATION_OUTPUT out_type
     ) {
+        auto errors = residual.errors();
         if (errors.size() == 0) { return Mat2D::Zero(0, 0); }
         // sum-of-squared error, for each Y component (rows), for 1-to-A components (cols)
         Mat2D SSEv = Mat2D::Zero(errors.size(), errors[0].cols());
@@ -262,11 +263,12 @@ namespace PLS {
     // return: a row, columns correspondings to columns in Y (used in error(X, Y, ...))
     // each row_i = the optimal number of components to impute a row_i
     Colsz optimal_num_components(
-        const ResidualData &errors,
+        const Residual &residual,
         const float_type ALPHA
     ) {
+        auto errors = residual.errors();
         // rows = Y component, cols = # of components
-        Mat2D press = validation(errors, PLS::RESS);
+        Mat2D press = validation(residual, PLS::RESS);
 
         Colsz min_press_idx(press.rows());
 
@@ -287,19 +289,19 @@ namespace PLS {
     };
 
     void print_validation(
-        const Residual &errors,
+        const Residual &residual,
         const VALIDATION_OUTPUT out_type,
         std::ostream &os
     ) {
-        os << errors.method() << " Validation:" << std::endl;
-        Mat2D em = validation(errors, out_type);
+        os << residual.method() << " Validation:" << std::endl;
+        Mat2D em = validation(residual, out_type);
         switch (out_type) {
             case PLS::MSE: os << "RMSE "; em = em.cwiseSqrt(); break;
             case PLS::RESS: os << "PRESS "; break;
             default: os << "UNKNOWN ";
         }
-        os << " Matrix:" << std::endl << em << std::endl;
-        os << "Optimal number of components:\t" << optimal_num_components(errors) << std::endl;
+        os << " Matrix (rows = Y variable; cols = # of components):" << std::endl << em << std::endl;
+        os << "Optimal number of components (by Y variable):\t" << optimal_num_components(residual) << std::endl;
     };
 
 };
@@ -470,7 +472,7 @@ Residual Model::cv_LOO() const {
 
     // vector of error matrices(rows=Y.rows(), cols=Y.cols())
     // col = component #, row = obs #, tier = Y category
-    ResidualData Ev(_Y.cols(), Mat2D::Zero(_X.rows(), A));
+    std::vector<Mat2D> Ev(_Y.cols(), Mat2D::Zero(_X.rows(), A));
 
     Model plsm_v(Xv, Yv, method); // this immediately performs the first fit
     for (size_t row_out = 0; row_out < static_cast<size_t>(_X.rows()); row_out++) {
@@ -495,7 +497,7 @@ Residual Model::cv_NEW_DATA(
     assert((X_new.cols() == _X.cols()) and (Y_new.cols() == _Y.cols()));
     // vector of error matrices(rows=Y.rows(), cols=Y.cols())
     // col = component #, row = obs #, tier = Y category
-    ResidualData Ev(Y_new.cols(), Mat2D::Zero(X_new.rows(), A));
+    std::vector<Mat2D> Ev(Y_new.cols(), Mat2D::Zero(X_new.rows(), A));
 
     for (size_t num_comps = 1; num_comps <= A; num_comps++) { // j is component #
         Mat2D res = residuals(X_new, Y_new, num_comps);
@@ -515,7 +517,7 @@ Residual Model::cv_LSO(
     const size_t train_size = N - test_size;
     assert((test_size != 0) and (train_size != 0));
 
-    ResidualData Ev(_Y.cols(), Mat2D::Zero(num_trials*test_size, A));
+    std::vector<Mat2D> Ev(_Y.cols(), Mat2D::Zero(num_trials*test_size, A));
 
     std::vector<Eigen::Index> sample(train_size);
     std::vector<Eigen::Index> complement(test_size);

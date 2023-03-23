@@ -42,13 +42,13 @@ namespace PLS {
     class Model; // forward declaration for Residual friendship
 
     class Residual {
-        const ResidualData _residual;
+        const std::vector<Mat2D> _residual;
         const std::string _method_label;
-        Residual(const ResidualData &residual, const std::string &method) : _residual(residual), _method_label(method) {}
+        Residual(const std::vector<Mat2D> &residual, const std::string &method) : _residual(residual), _method_label(method) {}
         friend class Model;
 
         public:            
-            operator ResidualData() const { return _residual; }
+            const std::vector<Mat2D> errors() const { return _residual; }
             const std::string method() const { return _method_label; }
     };
 
@@ -80,7 +80,7 @@ namespace PLS {
     template<typename EIGENTYPE>
     inline EIGENTYPE to_evector(const std::vector<float_type> &data) {
         EIGENTYPE v(data.size());
-        for (size_t i = 0; i < data.size(); i++) v[i] = data[i];
+        for (size_t i = 0; i < data.size(); i++) { v[i] = data[i]; }
         return v;
     }
 
@@ -143,17 +143,17 @@ namespace PLS {
     typedef enum { RESS, MSE } VALIDATION_OUTPUT;
 
     Mat2D validation(
-        const ResidualData &errors,
+        const Residual &residual,
         const PLS::VALIDATION_OUTPUT out_type
     );
 
     Colsz optimal_num_components(
-        const ResidualData &errors,
+        const Residual &residual,
         const float_type ALPHA = 0.1
     );
 
     void print_validation(
-        const Residual &errors,
+        const Residual &residual,
         const VALIDATION_OUTPUT out_type,
         std::ostream &os = std::cerr
     );

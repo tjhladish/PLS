@@ -387,15 +387,15 @@ Model::Model(
 // "Modified kernel algorithms 1 and 2"
 // from Dayal and MacGregor (1997) "Improved PLS Algorithms" J. of Chemometrics. 11,73-85.
 // TODO: if public, may need to trim internal matrices to few rows for smaller data?
-void Model::plsr(const Mat2D &Xmat, const Mat2D &Ymat, const METHOD &algorithm) {
+void Model::plsr(const Mat2D &X, const Mat2D &Y, const METHOD &algorithm) {
     method = algorithm;
-    int M = Ymat.cols(); // Number of response variables == columns in Y
+    int M = Y.cols(); // Number of response variables == columns in Y
 
-    if (algorithm == KERNEL_TYPE1) T.setZero(Xmat.rows(), A);
+    if (algorithm == KERNEL_TYPE1) T.setZero(X.rows(), A);
 
-    Mat2D XY = Xmat.transpose() * Ymat;
+    Mat2D XY = X.transpose() * Y;
     Mat2D XX;
-    if (algorithm == KERNEL_TYPE2) XX = Xmat.transpose() * Xmat;
+    if (algorithm == KERNEL_TYPE2) XX = X.transpose() * X;
 
     for (size_t i = 0; i < A; i++) {
         Colc w, p, q, r, t;
@@ -416,9 +416,9 @@ void Model::plsr(const Mat2D &Xmat, const Mat2D &Ymat, const METHOD &algorithm) 
         }
         
         if (algorithm == KERNEL_TYPE1) {
-            t = Xmat*r;
+            t = X*r;
             tt = (t.transpose()*t)(0,0);
-            p.noalias() = (Xmat.transpose()*t);
+            p.noalias() = (X.transpose()*t);
         } else if (algorithm == KERNEL_TYPE2) {
             tt = (r.transpose()*XX*r)(0,0);
             p.noalias() = (r.transpose()*XX).transpose();

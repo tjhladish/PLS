@@ -2,6 +2,9 @@ cmake_minimum_required( VERSION 3.24.2 )
 
 project(PLS VERSION 2.0.0)
 
+# TODO need to figure out the right way to ask for MPREAL_SUPPORT
+# would be propogated from parent project, presumably
+
 # TODO figure out if this is the right way to do this
 # intend: if new enough Eigen3 is found, use it;
 # otherwise, install from submoduled source

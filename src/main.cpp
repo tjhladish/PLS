@@ -9,7 +9,7 @@ using namespace PLS;
 
 int main(int argc, char *argv[]) {
 
-    if (argc < 4) { 
+    if (argc != 4) { 
         std::cerr << "Usage: ./pls X_data.csv Y_data.csv num_components" << std::endl;
         std::cerr << "NB: X and Y csvs must be comma delimited, square numerical data, with no headers." << std::endl;
         exit(100); 

@@ -24,21 +24,21 @@ int main(int argc, char *argv[]) {
     Mat2D X = colwise_z_scores( X_orig );
     Mat2D Y = colwise_z_scores( Y_orig );
 
-    int ncomp = atoi(argv[3]);
+    const size_t ncomp = atoi(argv[3]);
 
-    Model plsm(X, Y, ncomp);
+    Model plsm(X, Y, METHOD::KERNEL_TYPE1, ncomp);
 
     plsm.print_state();
 
     plsm.print_explained_variance(X, Y);
     
-    Residual looerror = plsm.error<LOO>(X, Y);
-    print_validation(looerror, LOO, MSE);
+    Residual looerror = plsm.cv_LOO();
+    print_validation(looerror, MSE);
 
     std::mt19937 rng;
 
-    Residual lsoerror = plsm.error<LSO>(X, Y, 0.3, 10*X.rows(), rng);
-    print_validation(lsoerror, LSO, MSE);
+    Residual lsoerror = plsm.cv_LSO(0.3, 10*X.rows(), rng);
+    print_validation(lsoerror, MSE);
 
     return 0;
 }

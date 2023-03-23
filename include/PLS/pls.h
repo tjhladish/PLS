@@ -32,26 +32,36 @@ typedef Eigen::Matrix<size_t, Eigen::Dynamic, 1> Colsz;
 typedef Eigen::RowVectorXi Rowi;
 typedef Eigen::Matrix<size_t, 1, Eigen::Dynamic> Rowsz;
 
+/**
+@brief Namespace for all Partial Least Square (PLS) related functions and classes.
+*/
 namespace PLS {
 
-    // Validation methods - used in `error()` functions
-    // leave-one-out (LOO) validation;
-    // leave-some-out (LSO) validation;
-    // new data (NEW_DATA) validation
-    typedef enum { LOO, LSO, NEW_DATA } VALIDATION_METHOD;
+    // error data structure
+    typedef std::vector<Mat2D> ResidualData;
+    class Model; // forward declaration for Residual friendship
 
-    typedef std::vector<Mat2D> Residual;
+    class Residual {
+        const ResidualData _residual;
+        const std::string _method_label;
+        Residual(const ResidualData &residual, const std::string &method) : _residual(residual), _method_label(method) {}
+        friend class Model;
+
+        public:            
+            operator ResidualData() const { return _residual; }
+            const std::string method() const { return _method_label; }
+    };
 
 /* ------- Eigen-related convenience functions for PLS specific operations ------- */
 
     // tag/index sort, from https://stackoverflow.com/a/37732329/167973
     template<typename T>
-    std::vector<size_t> ordered(const T& v) {
+    std::vector<size_t> ordered(const T &v) {
         std::vector<size_t> result(v.size());
         std::iota(std::begin(result), std::end(result), 0);
         std::sort(
             std::begin(result), std::end(result),
-            [&v](const auto & lhs, const auto & rhs) {
+            [&v](const auto &lhs, const auto &rhs) {
                 return *(v.begin() + lhs) < *(v.begin()+ rhs);
             }
         );
@@ -60,7 +70,7 @@ namespace PLS {
 
     // converts an Eigen vector type (Row or Col) to a std::vector
     template<typename EIGENTYPE>
-    std::vector<float_type> to_cvector(const EIGENTYPE & data) {
+    std::vector<float_type> to_cvector(const EIGENTYPE &data) {
         std::vector<float_type> vec(data.begin(), data.end());
         return vec;
     }
@@ -68,51 +78,51 @@ namespace PLS {
     // converts a std::vector to an Eigen vector type (Row or Col)
     // TODO: should this be a Eigen::Map type (i.e. a Matrix-like view of the data)?
     template<typename EIGENTYPE>
-    inline EIGENTYPE to_evector(const std::vector<float_type> & data) {
-        EIGENTYPE row(data.size());
-        for (size_t i = 0; i < data.size(); i++) row[i] = data[i];
-        return row;
+    inline EIGENTYPE to_evector(const std::vector<float_type> &data) {
+        EIGENTYPE v(data.size());
+        for (size_t i = 0; i < data.size(); i++) v[i] = data[i];
+        return v;
     }
 
 
     // for splitting lines from plaintext input file
-    std::vector<std::string> split(const std::string & s, const char separator = ',');
+    std::vector<std::string> split(const std::string &s, const char separator = ',');
 
     // for reading a matrix from a plaintext file; assumes no header, each line is a row
     // will exit if any rows have different number of columns, or on std::stod errors
-    Mat2D read_matrix_file(const std::string & filename, const char separator = ',');
+    Mat2D read_matrix_file(const std::string &filename, const char separator = ',');
 
     // for calculating the Total Sum of Squares (TSS) by column (mean specified)
     // TSS = sum((x - mean)^2)
-    Row SST(const Mat2D & mat, const Row & means);
+    Row SST(const Mat2D &mat, const Row &means);
     // for calculating the Total Sum of Squares (TSS) by column (mean calculated)
-    Row SST(const Mat2D & mat);
+    Row SST(const Mat2D &mat);
 
     // for calculating the stdev by column (mean specified)
-    Row colwise_stdev(const Mat2D & mat, const Row & means);
+    Row colwise_stdev(const Mat2D &mat, const Row &means);
     // for calculating the stdev by column (mean calculated)
-    Row colwise_stdev(const Mat2D & mat);
+    Row colwise_stdev(const Mat2D &mat);
 
-    Row z_scores(const Row & obs, const Row & mean, const Row & stdev);
+    Row z_scores(const Row &obs, const Row &mean, const Row &stdev);
 
     // for converting a matrix to z-scores by column (mean, stdev specified)
-    Mat2D colwise_z_scores(const Mat2D & mat, const Row & mean, const Row & stdev);
+    Mat2D colwise_z_scores(const Mat2D &mat, const Row &mean, const Row &stdev);
     // for converting a matrix to z-scores by column (mean, stdev calculated)
-    Mat2D colwise_z_scores(const Mat2D & mat);
+    Mat2D colwise_z_scores(const Mat2D &mat);
 
     // empirical approximation of the normalCDF
     float_type normalcdf(const float_type z);
 
     // computes the Wilcoxon signed-rank test statistic
-    float_type wilcoxon(const Col & err_1, const Col & err_2);
+    float_type wilcoxon(const Col &err_1, const Col &err_2);
 
     // given a full set of indices, shuffles it, and places a k-sized and n-k-sized
     // sample into the sample and complement vectors, respectively
     void rand_nchoosek(
-        std::mt19937 & rng,
-        std::vector<Eigen::Index> & full,
-        std::vector<Eigen::Index> & sample,
-        std::vector<Eigen::Index> & complement
+        std::mt19937 &rng,
+        std::vector<Eigen::Index> &full,
+        std::vector<Eigen::Index> &sample,
+        std::vector<Eigen::Index> &complement
     );
 
 /* -------------------- PLS class/analysis related definitions -------------------- */
@@ -133,20 +143,19 @@ namespace PLS {
     typedef enum { RESS, MSE } VALIDATION_OUTPUT;
 
     Mat2D validation(
-        const Residual & errors,
+        const ResidualData &errors,
         const PLS::VALIDATION_OUTPUT out_type
     );
 
     Colsz optimal_num_components(
-        const Residual & errors,
+        const ResidualData &errors,
         const float_type ALPHA = 0.1
     );
 
     void print_validation(
-        const Residual & errors,
-        const VALIDATION_METHOD method,
+        const Residual &errors,
         const VALIDATION_OUTPUT out_type,
-        std::ostream & os = std::cerr
+        std::ostream &os = std::cerr
     );
 
 /*
@@ -174,20 +183,26 @@ namespace PLS {
  */
 struct Model {
 
-    // use for a one-off PLSR
+    // TODO: private? should generally only be used for cross-validation exercises
     Model(
-        const Mat2D& X, const Mat2D& Y,
-        const size_t num_components,
-        const METHOD algorithm = KERNEL_TYPE1
+        const Mat2D &X, const Mat2D &Y,
+        const METHOD &algorithm,
+        const size_t &max_components
     );
 
-    Model & plsr (const Mat2D& X, const Mat2D& Y, const METHOD algorithm);
+    Model(
+        const Mat2D &X, const Mat2D &Y,
+        const METHOD &algorithm = KERNEL_TYPE1
+    );
+
+    // TODO: private? should only be used for cross-validation exercises
+    void plsr(const Mat2D &X, const Mat2D &Y, const METHOD &algorithm);
 
     // Transforms X_new into the latent space of the PLS model
     // i.e. the orthogonal X you wish you could measure
-    const Mat2Dc scores(const Mat2D& X_new, const size_t comp) const;
+    const Mat2Dc scores(const Mat2D &X_new, const size_t comp) const;
     // default to originally-specified number of components
-    const Mat2Dc scores(const Mat2D& X_new) const { return scores(X_new, A); }
+    const Mat2Dc scores(const Mat2D &X_new) const { return scores(X_new, A); }
 
     const Mat2Dc loadingsX(const size_t comp) const;
     const Mat2Dc loadingsX() const { return loadingsX(A); }
@@ -200,87 +215,55 @@ struct Model {
     const Mat2Dc coefficients() const { return coefficients(A); }
 
     // predicted Y values, given X values and pls model
-    const Mat2D fitted_values(const Mat2D& X, const size_t comp) const;
-    const Mat2D fitted_values(const Mat2D& X) const { return fitted_values(X, A); }
+    const Mat2D fitted_values(const Mat2D &X, const size_t comp) const;
+    const Mat2D fitted_values(const Mat2D &X) const { return fitted_values(X, A); }
 
     // unexplained portion of Y values
-    const Mat2D residuals(const Mat2D& X, const Mat2D& Y, const size_t comp) const;
-    const Mat2D residuals(const Mat2D& X, const Mat2D& Y) const { return residuals(X, Y, A); }
+    const Mat2D residuals(const Mat2D &X, const Mat2D &Y, const size_t comp) const;
+    const Mat2D residuals(const Mat2D &X, const Mat2D &Y) const { return residuals(X, Y, A); }
 
     // Sum of squared errors: uses estimated PLS model on X to predict Y, computes
     // the difference between the predicted and actual Y values, and squares the residual
     // and then sums (by column, the Y components) over all observations
-    const Row SSE(const Mat2D& X, const Mat2D& Y, const size_t comp) const;
-    const Row SSE(const Mat2D& X, const Mat2D& Y) const { return SSE(X, Y, A); }
+    const Row SSE(const Mat2D &X, const Mat2D &Y, const size_t comp) const;
+    const Row SSE(const Mat2D &X, const Mat2D &Y) const { return SSE(X, Y, A); }
 
     // fraction of explainable variance
-    const Row explained_variance(const Mat2D& X, const Mat2D& Y, const size_t comp) const;
-    const Row explained_variance(const Mat2D& X, const Mat2D& Y) const { return explained_variance(X, Y, A); }
+    const Row explained_variance(const Mat2D &X, const Mat2D &Y, const size_t comp) const;
+    const Row explained_variance(const Mat2D &X, const Mat2D &Y) const { return explained_variance(X, Y, A); }
 
-    Residual error_LOO(
-        const Mat2D& X, const Mat2D& Y
-    ) const;
-
-    Residual error_NEW_DATA(
-        const Mat2D& X, const Mat2D& Y
-    ) const;
-
-    Residual error_LSO(
-        const Mat2D& X, const Mat2D& Y,
-        const float_type test_fraction, const size_t num_trials, std::mt19937 & rng
-    ) const;
+    // cross-validation methods:
+    //  - LOO: leave-one-out => requires no new data
+    //  - LSO: leave-some-out => requires no new data, but does need the subset sizes and random number generator
+    //  - NEW_DATA: validating against new data - expects data outside the fitting data
+    Residual cv_LOO() const;
+    Residual cv_NEW_DATA(const Mat2D &X, const Mat2D &Y) const;
+    Residual cv_LSO(const float_type test_fraction, const size_t num_trials, std::mt19937 &rng) const;
 
     // output methods
     void print_explained_variance(
-        const Mat2D& X, const Mat2D& Y, std::ostream& os = std::cerr
+        const Mat2D &X, const Mat2D &Y, std::ostream &os = std::cerr
     ) const;
 
-    void print_state(std::ostream& os = std::cerr) const;
+    void print_state(std::ostream &os = std::cerr) const;
 
     private:
-        const Mat2D X, Y;
+        const Mat2D _X, _Y; // hang onto these for certain cross-validation methods
         size_t A; // number of components
         Mat2Dc P, W, R, Q, T;
         PLS::METHOD method;
 
-        // use when expecting to re-apply plsr repeatedly to new data of the same shape;
-        // i.e. when using cross-validation
         Model(
-            const size_t num_predictors, const size_t num_responses, const size_t num_components
+            const size_t &num_predictors, const size_t &num_responses,
+            const METHOD &algorithm = KERNEL_TYPE1
         );
 
+        Model(
+            const size_t &num_predictors, const size_t &num_responses,
+            const METHOD &algorithm, const size_t &max_components
+        );
 
 };
-
-template <typename T>
-struct ResidualCalculator {
-    ResidualCalculator(const std::string & method) : method(method) {};
-    const std::string method;
-    const Residual error(const Model & plsm, const Mat2D & X, const Mat2D & Y) const {
-        return static_cast<T>(*this)->errorImpl(plsm, X, Y);
-    }
-}
-
-struct LOO : public ResidualCalculator<LOO> {
-    LOO() : ResidualCalculator<LOO>("LOO") {};
-    const Residual errorImpl(const Model & plsm, const Mat2D & X, const Mat2D & Y) const;
-}
-
-struct NEWDATA : public ResidualCalculator<NEWDATA> {
-    NEWDATA() : ResidualCalculator<NEWDATA>("NEW DATA") {};
-    const Residual errorImpl(const Model & plsm, const Mat2D & X, const Mat2D & Y) const;
-}
-
-struct LSO : public ResidualCalculator<LSO> {
-    LSO() : ResidualCalculator<LSO>("LSO") {};
-    const Residual errorImpl(const Model & plsm, const Mat2D & X, const Mat2D & Y) const;
-
-}
-
-// to add a new validation method:
-// create a new struct following the above pattern (and corresponding implementation)
-// n.b. the some validation methods require additional arguments, e.g. LSO requires
-// a test_fraction and num_trials
 
 } // namespace PLS
 

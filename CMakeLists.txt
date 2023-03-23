@@ -29,7 +29,7 @@ set_target_properties(pls PROPERTIES
 
 target_include_directories(pls PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
 
-target_compile_features(pls PUBLIC cxx_std_20)
+target_compile_features(pls PUBLIC cxx_std_17)
 
 target_compile_definitions(
     pls PUBLIC "$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:PLS_STATIC_DEFINE>")

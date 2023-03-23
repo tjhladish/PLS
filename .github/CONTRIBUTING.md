@@ -51,12 +51,6 @@ As a general rule, we don’t assign issues to anyone. If you find an issue to w
 
 ### Make Changes
 
-#### Make changes in the UI
-
-Click **Make a contribution** at the bottom of any docs page to make small changes such as a typo, sentence fix, or a broken link. This takes you to the `.md` file where you can make your changes and [create a pull request](#pull-request) for a review.
-
- <img src="/contributing/images/contribution_cta.png" />
-
 #### Make changes in a codespace
 
 For more information about using a codespace for working on GitHub documentation, see "[Working in a codespace](https://github.com/github/docs/blob/main/contributing/codespace.md)."

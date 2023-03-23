@@ -18,3 +18,6 @@ TESTING ?=
 install: build-static build-shared
 	cmake --install build-shared $(TESTING)
 	cmake --install build-static $(TESTING)
+
+clean: .FORCE
+	git clean -ifdx

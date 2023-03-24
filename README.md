@@ -25,7 +25,7 @@ PLS ../toyX.csv ../toyY.csv 2              # test executable
 
 ## Contributing
 
-See our [contributing guidelines](CONTRIBUTING.md).
+See our [contributing guidelines](.github/CONTRIBUTING.md).
 
 ## Copyright
 

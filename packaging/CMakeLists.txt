@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.19)
+cmake_minimum_required(VERSION 3.16)
 
 set(pls_known_comps static shared)
 set(pls_comp_static NO)

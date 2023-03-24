@@ -323,7 +323,7 @@ using namespace PLS;
 Model::Model(
     const size_t &num_predictors, const size_t &num_responses,
     const METHOD &algorithm, const size_t &max_components
-) : method(algorithm), A(max_components) {
+) : A(max_components), method(algorithm) {
     assert(max_components <= num_predictors);
     P.setZero(num_predictors, A);
     W.setZero(num_predictors, A);
@@ -341,8 +341,8 @@ Model::Model(
     const Mat2D &X, const Mat2D &Y,
     const PLS::METHOD &algorithm,
     const size_t &max_components
-) : _X(X), _Y(Y), method(algorithm), A(max_components) {
-    assert(max_components <= _X.cols());
+) : _X(X), _Y(Y), A(max_components), method(algorithm) {
+    assert(max_components <= static_cast<size_t>(_X.cols()));
     assert(_X.rows() != 0);
     assert(_X.rows() == _Y.rows());
     P.setZero(_X.cols(), A);

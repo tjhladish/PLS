@@ -15,6 +15,7 @@ if (NOT Eigen3_FOUND)
   FetchContent_Declare(
     Eigen3
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/lib/eigen
+    GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
   )
   FetchContent_MakeAvailable(Eigen3)
 endif(NOT Eigen3_FOUND)

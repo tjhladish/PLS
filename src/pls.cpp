@@ -1,11 +1,18 @@
+#include <PLS/pls.h>
+
 #include <fstream> // ifstream
 #include <cmath> // log10, ceil
 #include <iomanip> // setw
 #include <random> // mt19937
 #include <cassert> // assert
+
+#include <Eigen/Core> // shuffle
 #include <Eigen/Dense> // Matrix methods
 #include <Eigen/Eigenvalues> // EigenSolver
-#include <PLS/pls.h>
+
+#ifdef MPREAL_SUPPORT
+#include <unsupported/Eigen/MPRealSupport>
+#endif // MPREAL_SUPPORT
 
 namespace PLS {
     
@@ -312,43 +319,42 @@ using namespace PLS;
 // Model::Model(
 //     const size_t num_predictors, const size_t num_responses, const size_t num_components
 // ) : A(num_components) {
-//     P.setZero(num_predictors, A);
-//     W.setZero(num_predictors, A);
-//     R.setZero(num_predictors, A);
-//     Q.setZero(num_responses, A);
+//     P->setZero(num_predictors, A);
+//     W->setZero(num_predictors, A);
+//     R->setZero(num_predictors, A);
+//     Q->setZero(num_responses, A);
 //     // T will be initialized if needed
 // }
 
-// set up back end; no X/Y data provided
-Model::Model(
-    const size_t &num_predictors, const size_t &num_responses,
-    const METHOD &algorithm, const size_t &max_components
-) : A(max_components), method(algorithm) {
-    assert(max_components <= num_predictors);
-    P.setZero(num_predictors, A);
-    W.setZero(num_predictors, A);
-    R.setZero(num_predictors, A);
-    Q.setZero(num_responses, A);
-}
+// // set up back end; no X/Y data provided
+// Model::Model(
+//     const size_t &num_predictors, const size_t &num_responses,
+//     const METHOD &algorithm, const size_t &max_components
+// ) : A(max_components), method(algorithm) {
+//     assert(max_components <= num_predictors);
+//     P->setZero(num_predictors, A);
+//     W->setZero(num_predictors, A);
+//     R->setZero(num_predictors, A);
+//     Q->setZero(num_responses, A);
+// }
 
-Model::Model(
-    const size_t &num_predictors, const size_t &num_responses,
-    const METHOD &algorithm
-) : Model(num_predictors, num_responses, algorithm, num_predictors) {}
+// Model::Model(
+//     const size_t &num_predictors, const size_t &num_responses,
+//     const METHOD &algorithm
+// ) : Model(num_predictors, num_responses, algorithm, num_predictors) {}
 
 // immediately perform PLSR on X/Y data, up to a maximum number of components
 Model::Model(
     const Mat2D &X, const Mat2D &Y,
     const PLS::METHOD &algorithm,
     const size_t &max_components
-) : _X(X), _Y(Y), A(max_components), method(algorithm) {
+) : _X(X), _Y(Y), A(max_components), method(algorithm),
+    P(new Mat2Dc(_X.cols(), A)), W(new Mat2Dc(_X.cols(), A)), R(new Mat2Dc(_X.cols(), A)),
+    Q(new Mat2Dc(_Y.cols(), A)), T(new Mat2Dc(_X.rows(), A))
+{
     assert(max_components <= static_cast<size_t>(_X.cols()));
     assert(_X.rows() != 0);
     assert(_X.rows() == _Y.rows());
-    P.setZero(_X.cols(), A);
-    W.setZero(_X.cols(), A);
-    R.setZero(_X.cols(), A);
-    Q.setZero(_Y.cols(), A);
     plsr(_X, _Y, algorithm);
 }
 
@@ -357,6 +363,14 @@ Model::Model(
     const Mat2D &X, const Mat2D &Y,
     const PLS::METHOD &algorithm
 ) : Model(X, Y, algorithm, X.cols()) { }
+
+Model::~Model() {
+    delete P;
+    delete W;
+    delete R;
+    delete Q;
+    delete T;
+}
 
 /*
  *   Variable definitions from source paper:
@@ -391,7 +405,7 @@ void Model::plsr(const Mat2D &X, const Mat2D &Y, const METHOD &algorithm) {
     method = algorithm;
     int M = Y.cols(); // Number of response variables == columns in Y
 
-    if (algorithm == KERNEL_TYPE1) T.setZero(X.rows(), A);
+    if (algorithm == KERNEL_TYPE1) T->setZero(X.rows(), A);
 
     Mat2D XY = X.transpose() * Y;
     Mat2D XX;
@@ -412,7 +426,7 @@ void Model::plsr(const Mat2D &X, const Mat2D &Y, const METHOD &algorithm) {
         r = w;
 
         if (i != 0) for (size_t j = 0; j <= i - 1; j++) {
-            r -= (P.col(j).transpose()*w)(0,0)*R.col(j);
+            r -= (P->col(j).transpose()*w)(0,0)*R->col(j);
         }
         
         if (algorithm == KERNEL_TYPE1) {
@@ -427,36 +441,63 @@ void Model::plsr(const Mat2D &X, const Mat2D &Y, const METHOD &algorithm) {
         p /= tt;
         q.noalias() = (r.transpose()*XY).transpose(); q /= tt;
         XY -= ((p*q.transpose())*tt).real(); // is casting this to 'real' always safe?
-        W.col(i) = w;
-        P.col(i) = p;
-        Q.col(i) = q;
-        R.col(i) = r;
-        if (algorithm == KERNEL_TYPE1) T.col(i) = t;
+        W->col(i) = w;
+        P->col(i) = p;
+        Q->col(i) = q;
+        R->col(i) = r;
+        if (algorithm == KERNEL_TYPE1) T->col(i) = t;
     }
 
 };
 
 const Mat2Dc Model::scores(const Mat2D &X_new, const size_t comp) const {
-    assert (A >= comp);
-    return X_new * R.leftCols(comp);
+    assert(A >= comp);
+    assert(comp > 0);
+    return X_new * R->leftCols(comp);
 };
+
+const Mat2Dc Model::scores(const Mat2D &X_new) const { return scores(X_new, A); };
+
+const Mat2Dc Model::loadingsX(const size_t comp) const {
+    assert(comp <= A);
+    assert(comp > 0);
+    return P->leftCols(comp);
+};
+
+const Mat2Dc Model::loadingsX() const { return loadingsX(A); }
+
+const Mat2Dc Model::loadingsY(const size_t comp) const {
+    assert(comp <= A);
+    assert(comp > 0);
+    return Q->leftCols(comp);
+};
+
+const Mat2Dc Model::loadingsY() const { return loadingsY(A); }
 
 const Mat2Dc Model::coefficients(const size_t comp) const {
     assert (A >= comp);
-    return R.leftCols(comp)*Q.leftCols(comp).transpose();
+    return R->leftCols(comp)*Q->leftCols(comp).transpose();
 };
+
+const Mat2Dc Model::coefficients() const { return coefficients(A); }
 
 const Mat2D Model::fitted_values(const Mat2D &X_new, const size_t comp) const {
     return X_new*coefficients(comp).real();
 };
 
+const Mat2D Model::fitted_values(const Mat2D &X) const { return fitted_values(X, A); }
+
 const Mat2D Model::residuals(const Mat2D &X_new, const Mat2D &Y_new, const size_t comp) const {
     return Y_new - fitted_values(X_new, comp);
 };
 
+const Mat2D Model::residuals(const Mat2D &X, const Mat2D &Y) const { return residuals(X, Y, A); }
+
 const Row Model::SSE(const Mat2D &X_new, const Mat2D &Y_new, const size_t comp) const {
     return residuals(X_new, Y_new, comp).colwise().squaredNorm();
 };
+
+const Row Model::SSE(const Mat2D &X, const Mat2D &Y) const { return SSE(X, Y, A); }
 
 const Row Model::explained_variance(
     const Mat2D &X_new, const Mat2D &Y_new, const size_t comp
@@ -465,6 +506,8 @@ const Row Model::explained_variance(
         1.0 - (SSE(X_new, Y_new, comp).array() / SST(Y_new).array())
     ).matrix(); // 1 - SSE/SST, using eigen broadcasting
 }
+
+const Row Model::explained_variance(const Mat2D &X, const Mat2D &Y) const { return explained_variance(X, Y, A); }
 
 Residual Model::cv_LOO() const {
     Mat2D Xv = _X.bottomRows(_X.rows()-1);

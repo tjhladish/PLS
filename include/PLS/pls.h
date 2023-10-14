@@ -1,36 +1,13 @@
 #ifndef PLS_H
 #define PLS_H
 
-#include <Eigen/Core> // only need to know `Matrix`es exist for header
+#include <PLS/types.h> // only need to know forward declarations for header
+
 #include <vector>
 #include <iostream> // for ostream, std::cerr
 #include <random> // for std::mt19937
 #include <algorithm> // sort
 #include <numeric> // iota
-
-#ifdef MPREAL_SUPPORT
-#include "mpreal.h"
-#include <unsupported/Eigen/MPRealSupport>
-    using namespace mpfr;
-    typedef mpreal float_type;
-    typedef Eigen::Matrix<float_type, Eigen::Dynamic, Eigen::Dynamic> Mat2D;
-    typedef Eigen::Matrix<float_type, Eigen::Dynamic, 1> Col;
-    typedef Eigen::Matrix<float_type, 1, Eigen::Dynamic> Row;
-    typedef Eigen::Matrix<std::complex<float_type>, Eigen::Dynamic, Eigen::Dynamic> Mat2Dc;
-    typedef Eigen::Matrix<std::complex<float_type>, Eigen::Dynamic, 1> Colc;
-#else
-    typedef double float_type;
-    typedef Eigen::MatrixXd Mat2D;
-    typedef Eigen::VectorXd Col;
-    typedef Eigen::RowVectorXd Row;
-    typedef Eigen::MatrixXcd Mat2Dc;
-    typedef Eigen::VectorXcd Colc;
-#endif // MPREAL_SUPPORT
-
-typedef Eigen::VectorXi Coli;
-typedef Eigen::Matrix<size_t, Eigen::Dynamic, 1> Colsz;
-typedef Eigen::RowVectorXi Rowi;
-typedef Eigen::Matrix<size_t, 1, Eigen::Dynamic> Rowsz;
 
 /**
 @brief Namespace for all Partial Least Square (PLS) related functions and classes.
@@ -198,39 +175,39 @@ struct Model {
     // TODO: private? should only be used for cross-validation exercises
     void plsr(const Mat2D &X, const Mat2D &Y, const METHOD &algorithm);
 
+    // the modes below all default to originally-specified number of components
+
     // Transforms X_new into the latent space of the PLS model
     // i.e. the orthogonal X you wish you could measure
     const Mat2Dc scores(const Mat2D &X_new, const size_t comp) const;
-    // default to originally-specified number of components
-    const Mat2Dc scores(const Mat2D &X_new) const { return scores(X_new, A); }
+    const Mat2Dc scores(const Mat2D &X_new) const;
 
     const Mat2Dc loadingsX(const size_t comp) const;
-    const Mat2Dc loadingsX() const { return loadingsX(A); }
-
+    const Mat2Dc loadingsX() const;
     const Mat2Dc loadingsY(const size_t comp) const; 
-    const Mat2Dc loadingsY() const { return loadingsY(A); }
+    const Mat2Dc loadingsY() const;
 
     // compute the regression coefficients (aka 'beta')
     const Mat2Dc coefficients(const size_t comp) const;
-    const Mat2Dc coefficients() const { return coefficients(A); }
+    const Mat2Dc coefficients() const;
 
     // predicted Y values, given X values and pls model
     const Mat2D fitted_values(const Mat2D &X, const size_t comp) const;
-    const Mat2D fitted_values(const Mat2D &X) const { return fitted_values(X, A); }
+    const Mat2D fitted_values(const Mat2D &X) const;
 
     // unexplained portion of Y values
     const Mat2D residuals(const Mat2D &X, const Mat2D &Y, const size_t comp) const;
-    const Mat2D residuals(const Mat2D &X, const Mat2D &Y) const { return residuals(X, Y, A); }
+    const Mat2D residuals(const Mat2D &X, const Mat2D &Y) const;
 
     // Sum of squared errors: uses estimated PLS model on X to predict Y, computes
     // the difference between the predicted and actual Y values, and squares the residual
     // and then sums (by column, the Y components) over all observations
     const Row SSE(const Mat2D &X, const Mat2D &Y, const size_t comp) const;
-    const Row SSE(const Mat2D &X, const Mat2D &Y) const { return SSE(X, Y, A); }
+    const Row SSE(const Mat2D &X, const Mat2D &Y) const;
 
     // fraction of explainable variance
     const Row explained_variance(const Mat2D &X, const Mat2D &Y, const size_t comp) const;
-    const Row explained_variance(const Mat2D &X, const Mat2D &Y) const { return explained_variance(X, Y, A); }
+    const Row explained_variance(const Mat2D &X, const Mat2D &Y) const;
 
     // cross-validation methods:
     //  - LOO: leave-one-out => requires no new data
@@ -247,21 +224,23 @@ struct Model {
 
     void print_state(std::ostream &os = std::cerr) const;
 
+    ~Model();
+
     private:
-        const Mat2D _X, _Y; // hang onto these for certain cross-validation methods
+        const Mat2D &_X, &_Y; // hang onto these for certain cross-validation methods
         size_t A; // number of components
-        Mat2Dc P, W, R, Q, T;
+        Mat2Dc *P, *W, *R, *Q, *T;
         PLS::METHOD method;
 
-        Model(
-            const size_t &num_predictors, const size_t &num_responses,
-            const METHOD &algorithm = KERNEL_TYPE1
-        );
+        // Model(
+        //     const size_t &num_predictors, const size_t &num_responses,
+        //     const METHOD &algorithm = KERNEL_TYPE1
+        // );
 
-        Model(
-            const size_t &num_predictors, const size_t &num_responses,
-            const METHOD &algorithm, const size_t &max_components
-        );
+        // Model(
+        //     const size_t &num_predictors, const size_t &num_responses,
+        //     const METHOD &algorithm, const size_t &max_components
+        // );
 
 };
 

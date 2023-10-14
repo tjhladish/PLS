@@ -2,6 +2,8 @@ cmake_minimum_required( VERSION 3.16 )
 
 project(PLS VERSION 2.0.0)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # TODO need to figure out the right way to ask for MPREAL_SUPPORT
 # would be propogated from parent project, presumably
 
@@ -9,6 +11,7 @@ project(PLS VERSION 2.0.0)
 # intend: if new enough Eigen3 is found, use it;
 # otherwise, install from submoduled source
 find_package(Eigen3 3.4.90 NO_MODULE)
+
 if (NOT Eigen3_FOUND)
   message(WARNING "Eigen3 3.4.90+ not found; installing from source...")
   include(FetchContent)
@@ -18,7 +21,9 @@ if (NOT Eigen3_FOUND)
     GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
   )
   FetchContent_MakeAvailable(Eigen3)
-endif(NOT Eigen3_FOUND)
+else()
+  message(STATUS "Eigen3 found: ${Eigen3_VERSION}")
+endif()
 
 if (DEFINED ${CMAKE_PROJECT_NAME}_SHARED_LIBS)
     set(BUILD_SHARED_LIBS "${${CMAKE_PROJECT_NAME}_SHARED_LIBS}")
@@ -46,7 +51,7 @@ add_executable( PLS src/main.cpp )
 target_link_libraries( PLS pls )
 
 install(TARGETS PLS pls
-  RUNTIME DESTINATION bin
+#  RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
 )

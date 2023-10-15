@@ -51,7 +51,7 @@ add_executable( PLS src/main.cpp )
 target_link_libraries( PLS pls )
 
 install(TARGETS PLS pls
-#  RUNTIME DESTINATION bin
+  RUNTIME DESTINATION bin
   LIBRARY DESTINATION lib
   ARCHIVE DESTINATION lib
 )

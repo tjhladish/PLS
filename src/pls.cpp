@@ -326,36 +326,41 @@ using namespace PLS;
 //     // T will be initialized if needed
 // }
 
-// // set up back end; no X/Y data provided
-// Model::Model(
-//     const size_t &num_predictors, const size_t &num_responses,
-//     const METHOD &algorithm, const size_t &max_components
-// ) : A(max_components), method(algorithm) {
-//     assert(max_components <= num_predictors);
-//     P->setZero(num_predictors, A);
-//     W->setZero(num_predictors, A);
-//     R->setZero(num_predictors, A);
-//     Q->setZero(num_responses, A);
-// }
+// set up back end; no X/Y data provided
+Model::Model(
+    const size_t &num_predictors, const size_t &num_responses,
+    const METHOD &algorithm, const size_t &max_components
+) : A(max_components), method(algorithm),
+    _X(new Mat2D(0, num_predictors)), _Y(new Mat2D(0, num_responses)),
+    P(new Mat2Dc(num_predictors, A)), W(new Mat2Dc(num_predictors, A)),
+    R(new Mat2Dc(num_predictors, A)), Q(new Mat2Dc(num_responses, A)),
+    T(new Mat2Dc(0, A))
+{
+    assert(max_components <= num_predictors);
+    P->setZero();
+    W->setZero();
+    R->setZero();
+    Q->setZero(); 
+}
 
-// Model::Model(
-//     const size_t &num_predictors, const size_t &num_responses,
-//     const METHOD &algorithm
-// ) : Model(num_predictors, num_responses, algorithm, num_predictors) {}
+Model::Model(
+    const size_t &num_predictors, const size_t &num_responses,
+    const METHOD &algorithm
+) : Model(num_predictors, num_responses, algorithm, num_predictors) {}
 
 // immediately perform PLSR on X/Y data, up to a maximum number of components
 Model::Model(
     const Mat2D &X, const Mat2D &Y,
     const PLS::METHOD &algorithm,
     const size_t &max_components
-) : _X(X), _Y(Y), A(max_components), method(algorithm),
-    P(new Mat2Dc(_X.cols(), A)), W(new Mat2Dc(_X.cols(), A)), R(new Mat2Dc(_X.cols(), A)),
-    Q(new Mat2Dc(_Y.cols(), A)), T(new Mat2Dc(_X.rows(), A))
+) : _X(&X), _Y(&Y), A(max_components), method(algorithm),
+    P(new Mat2Dc(_X->cols(), A)), W(new Mat2Dc(_X->cols(), A)), R(new Mat2Dc(_X->cols(), A)),
+    Q(new Mat2Dc(_Y->cols(), A)), T(new Mat2Dc(_X->rows(), A))
 {
-    assert(max_components <= static_cast<size_t>(_X.cols()));
-    assert(_X.rows() != 0);
-    assert(_X.rows() == _Y.rows());
-    plsr(_X, _Y, algorithm);
+    assert(A <= static_cast<size_t>(_X->cols()));
+    assert(_X->rows() != 0);
+    assert(_X->rows() == _Y->rows());
+    plsr(*_X, *_Y, method);
 }
 
 // immediately perform PLSR on X/Y data, up to the maximum number of components
@@ -365,6 +370,8 @@ Model::Model(
 ) : Model(X, Y, algorithm, X.cols()) { }
 
 Model::~Model() {
+    delete _X;
+    delete _Y;
     delete P;
     delete W;
     delete R;
@@ -402,7 +409,7 @@ Model::~Model() {
 // from Dayal and MacGregor (1997) "Improved PLS Algorithms" J. of Chemometrics. 11,73-85.
 // TODO: if public, may need to trim internal matrices to few rows for smaller data?
 void Model::plsr(const Mat2D &X, const Mat2D &Y, const METHOD &algorithm) {
-    method = algorithm;
+
     int M = Y.cols(); // Number of response variables == columns in Y
 
     if (algorithm == KERNEL_TYPE1) T->setZero(X.rows(), A);
@@ -510,23 +517,23 @@ const Row Model::explained_variance(
 const Row Model::explained_variance(const Mat2D &X, const Mat2D &Y) const { return explained_variance(X, Y, A); }
 
 Residual Model::cv_LOO() const {
-    Mat2D Xv = _X.bottomRows(_X.rows()-1);
-    Mat2D Yv = _Y.bottomRows(_Y.rows()-1);
+    Mat2D Xv = _X->bottomRows(_X->rows()-1);
+    Mat2D Yv = _Y->bottomRows(_Y->rows()-1);
 
     // vector of error matrices(rows=Y.rows(), cols=Y.cols())
     // col = component #, row = obs #, tier = Y category
-    std::vector<Mat2D> Ev(_Y.cols(), Mat2D::Zero(_X.rows(), A));
+    std::vector<Mat2D> Ev(_Y->cols(), Mat2D::Zero(_X->rows(), A));
 
     Model plsm_v(Xv, Yv, method); // this immediately performs the first fit
-    for (size_t row_out = 0; row_out < static_cast<size_t>(_X.rows()); row_out++) {
+    for (size_t row_out = 0; row_out < static_cast<size_t>(_X->rows()); row_out++) {
         for (size_t num_comps = 1; num_comps <= A; num_comps++) {
-            Row res = plsm_v.residuals(_X.row(row_out), _Y.row(row_out), num_comps).row(0);
+            Row res = plsm_v.residuals(_X->row(row_out), _Y->row(row_out), num_comps).row(0);
             for (int k = 0; k < res.size(); k++) Ev[k](row_out, num_comps-1) = res(k);
         }
         // if not on the last row: swap which row is being left out => refit model
         if (row_out < static_cast<size_t>(Xv.rows())) {
-            Xv.row(row_out) = _X.row(row_out);
-            Yv.row(row_out) = _Y.row(row_out);
+            Xv.row(row_out) = _X->row(row_out);
+            Yv.row(row_out) = _Y->row(row_out);
             plsm_v.plsr(Xv, Yv, method);
         }
     }
@@ -537,7 +544,7 @@ Residual Model::cv_LOO() const {
 Residual Model::cv_NEW_DATA(
     const Mat2D &X_new, const Mat2D &Y_new
 ) const {
-    assert((X_new.cols() == _X.cols()) and (Y_new.cols() == _Y.cols()));
+    assert((X_new.cols() == _X->cols()) and (Y_new.cols() == _Y->cols()));
     // vector of error matrices(rows=Y.rows(), cols=Y.cols())
     // col = component #, row = obs #, tier = Y category
     std::vector<Mat2D> Ev(Y_new.cols(), Mat2D::Zero(X_new.rows(), A));
@@ -555,30 +562,30 @@ Residual Model::cv_NEW_DATA(
 Residual Model::cv_LSO(
     const float_type test_fraction, const size_t num_trials, std::mt19937 &rng
 ) const {
-    const size_t N = _X.rows();
+    const size_t N = _X->rows();
     const size_t test_size = static_cast<size_t>(test_fraction * N + 0.5);
     const size_t train_size = N - test_size;
     assert((test_size != 0) and (train_size != 0));
 
-    std::vector<Mat2D> Ev(_Y.cols(), Mat2D::Zero(num_trials*test_size, A));
+    std::vector<Mat2D> Ev(_Y->cols(), Mat2D::Zero(num_trials*test_size, A));
 
     std::vector<Eigen::Index> sample(train_size);
     std::vector<Eigen::Index> complement(test_size);
     std::vector<Eigen::Index> full(sample.size() + complement.size());
     std::iota(full.begin(), full.end(), 0);
 
-    Mat2D Xv(train_size, _X.cols()); // values we're training on
-    Mat2D Yv(train_size, _Y.cols());
-    Mat2D Xp(test_size, _X.cols());  // values we're predicting
-    Mat2D Yp(test_size, _Y.cols());
+    Mat2D Xv(train_size, _X->cols()); // values we're training on
+    Mat2D Yv(train_size, _Y->cols());
+    Mat2D Xp(test_size, _X->cols());  // values we're predicting
+    Mat2D Yp(test_size, _Y->cols());
     Model plsm_v(Xv.cols(), Yv.cols(), method);    // no-op at this stage
 
     for (size_t rep = 0; rep < num_trials; ++rep) {
         rand_nchoosek(rng, full, sample, complement); // shuffle full, slice out sample (train) and complement (test)
-        Xv = _X(sample, Eigen::placeholders::all);
-        Yv = _Y(sample, Eigen::placeholders::all);
-        Xp = _X(complement, Eigen::placeholders::all);
-        Yp = _Y(complement, Eigen::placeholders::all);
+        Xv = (*_X)(sample, Eigen::placeholders::all);
+        Yv = (*_Y)(sample, Eigen::placeholders::all);
+        Xp = (*_X)(complement, Eigen::placeholders::all);
+        Yp = (*_Y)(complement, Eigen::placeholders::all);
         plsm_v.plsr(Xv, Yv, method); // do actual fit
         for (size_t num_comps = 1; num_comps <= this->A; num_comps++) {
             Mat2D res = plsm_v.residuals(Xp, Yp, num_comps);

@@ -227,20 +227,31 @@ struct Model {
     ~Model();
 
     private:
-        const Mat2D &_X, &_Y; // hang onto these for certain cross-validation methods
-        size_t A; // number of components
-        Mat2Dc *P, *W, *R, *Q, *T;
-        PLS::METHOD method;
+        const size_t A; // number of components
+        // TYPE * const == the pointer is a const, not the TYPE it points to
 
-        // Model(
-        //     const size_t &num_predictors, const size_t &num_responses,
-        //     const METHOD &algorithm = KERNEL_TYPE1
-        // );
+        // hang onto these for certain cross-validation methods
+        const Mat2D * const _X;
+        const Mat2D * const _Y;
 
-        // Model(
-        //     const size_t &num_predictors, const size_t &num_responses,
-        //     const METHOD &algorithm, const size_t &max_components
-        // );
+        Mat2Dc * const P;
+        Mat2Dc * const W;
+        Mat2Dc * const R;
+        Mat2Dc * const Q;
+        Mat2Dc * const T;
+
+        const PLS::METHOD method;
+
+        // internal constructor for cross-validation methods
+        Model(
+            const size_t &num_predictors, const size_t &num_responses,
+            const METHOD &algorithm = KERNEL_TYPE1
+        );
+
+        Model(
+            const size_t &num_predictors, const size_t &num_responses,
+            const METHOD &algorithm, const size_t &max_components
+        );
 
 };
 

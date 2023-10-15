@@ -331,7 +331,7 @@ Model::Model(
     const size_t &num_predictors, const size_t &num_responses,
     const METHOD &algorithm, const size_t &max_components
 ) : A(max_components), method(algorithm),
-    _X(new Mat2D(0, num_predictors)), _Y(new Mat2D(0, num_responses)),
+    _X(nullptr), _Y(nullptr),
     P(new Mat2Dc(num_predictors, A)), W(new Mat2Dc(num_predictors, A)),
     R(new Mat2Dc(num_predictors, A)), Q(new Mat2Dc(num_responses, A)),
     T(new Mat2Dc(0, A))
@@ -340,7 +340,7 @@ Model::Model(
     P->setZero();
     W->setZero();
     R->setZero();
-    Q->setZero(); 
+    Q->setZero();
 }
 
 Model::Model(
@@ -353,7 +353,8 @@ Model::Model(
     const Mat2D &X, const Mat2D &Y,
     const PLS::METHOD &algorithm,
     const size_t &max_components
-) : _X(&X), _Y(&Y), A(max_components), method(algorithm),
+) : _X(&X), _Y(&Y),
+    A(max_components), method(algorithm),
     P(new Mat2Dc(_X->cols(), A)), W(new Mat2Dc(_X->cols(), A)), R(new Mat2Dc(_X->cols(), A)),
     Q(new Mat2Dc(_Y->cols(), A)), T(new Mat2Dc(_X->rows(), A))
 {
@@ -368,16 +369,6 @@ Model::Model(
     const Mat2D &X, const Mat2D &Y,
     const PLS::METHOD &algorithm
 ) : Model(X, Y, algorithm, X.cols()) { }
-
-Model::~Model() {
-    delete _X;
-    delete _Y;
-    delete P;
-    delete W;
-    delete R;
-    delete Q;
-    delete T;
-}
 
 /*
  *   Variable definitions from source paper:
@@ -537,6 +528,7 @@ Residual Model::cv_LOO() const {
             plsm_v.plsr(Xv, Yv, method);
         }
     }
+
     return Residual(Ev, "LOO");
 };
 
@@ -582,10 +574,10 @@ Residual Model::cv_LSO(
 
     for (size_t rep = 0; rep < num_trials; ++rep) {
         rand_nchoosek(rng, full, sample, complement); // shuffle full, slice out sample (train) and complement (test)
-        Xv = (*_X)(sample, Eigen::placeholders::all);
-        Yv = (*_Y)(sample, Eigen::placeholders::all);
-        Xp = (*_X)(complement, Eigen::placeholders::all);
-        Yp = (*_Y)(complement, Eigen::placeholders::all);
+        Xv = _X->operator()(sample, Eigen::placeholders::all);
+        Yv = _Y->operator()(sample, Eigen::placeholders::all);
+        Xp = _X->operator()(complement, Eigen::placeholders::all);
+        Yp = _Y->operator()(complement, Eigen::placeholders::all);
         plsm_v.plsr(Xv, Yv, method); // do actual fit
         for (size_t num_comps = 1; num_comps <= this->A; num_comps++) {
             Mat2D res = plsm_v.residuals(Xp, Yp, num_comps);
@@ -615,15 +607,15 @@ void Model::print_state(std::ostream &os) const {
     //P, W, R, Q, T
     os <<
         "P:"   << std::endl <<
-        P << std::endl <<
+        *P << std::endl <<
         "W:"   << std::endl <<
-        W << std::endl <<
+        *W << std::endl <<
         "R:"   << std::endl <<
-        R << std::endl <<
+        *R << std::endl <<
         "Q:"   << std::endl <<
-        Q << std::endl <<
+        *Q << std::endl <<
         "T:"   << std::endl <<
-        T << std::endl <<
+        *T << std::endl <<
         "coefficients:" << std::endl <<
         coefficients() << std::endl;
 

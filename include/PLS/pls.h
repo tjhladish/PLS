@@ -3,6 +3,7 @@
 
 #include <PLS/types.h> // only need to know forward declarations for header
 
+#include <memory> // for std::unique_ptr, std::shared_ptr
 #include <vector>
 #include <iostream> // for ostream, std::cerr
 #include <random> // for std::mt19937
@@ -224,8 +225,6 @@ struct Model {
 
     void print_state(std::ostream &os = std::cerr) const;
 
-    ~Model();
-
     private:
         const size_t A; // number of components
         // TYPE * const == the pointer is a const, not the TYPE it points to
@@ -234,11 +233,7 @@ struct Model {
         const Mat2D * const _X;
         const Mat2D * const _Y;
 
-        Mat2Dc * const P;
-        Mat2Dc * const W;
-        Mat2Dc * const R;
-        Mat2Dc * const Q;
-        Mat2Dc * const T;
+        const std::unique_ptr<Mat2Dc> P, W, R, Q, T;
 
         const PLS::METHOD method;
 

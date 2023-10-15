@@ -17,5 +17,11 @@ build-shared: .FORCE
 build-static: .FORCE
 	mkdir -p $@ && cd $@ && cmake .. -DBUILD_SHARED_LIBS=NO -DCMAKE_BUILD_TYPE=Release && cmake --build .
 
+build-debug: .FORCE
+	mkdir -p $@ && cd $@ && cmake .. -DBUILD_SHARED_LIBS=NO -DCMAKE_BUILD_TYPE=Debug && cmake --build .
+
+valgrind: build-debug
+	cd $^ && valgrind --leak-check=yes ./PLS ../toyX.csv ../toyY.csv 2
+
 clean: .FORCE
 	git clean -ifdx

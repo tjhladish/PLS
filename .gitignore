@@ -5,6 +5,7 @@ CMakeCache.txt
 CMakeFiles
 build-shared/*
 build-static/*
+build-debug/*
 build/*
 _install/*
 .vscode

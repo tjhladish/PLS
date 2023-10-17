@@ -1,8 +1,14 @@
 cmake_minimum_required( VERSION 3.16 )
 
-project(PLS VERSION 2.0.0)
+project(PLS VERSION 2.0.1 LANGUAGES CXX)
 
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+#include(CMakePackageConfigHelpers)
+
+# configure_package_config_file(
+#   "${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
+#   INSTALL_DESTINATION
+#   ${CMAKE_INSTALL_LIBDIR}/cmake/PLS-${PROJECT_VERSION}
+# )
 
 # TODO need to figure out the right way to ask for MPREAL_SUPPORT
 # would be propogated from parent project, presumably
@@ -10,7 +16,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # TODO figure out if this is the right way to do this
 # intend: if new enough Eigen3 is found, use it;
 # otherwise, install from submoduled source
-find_package(Eigen3 3.4.90 NO_MODULE)
+find_package(Eigen3 3.4.90)
 
 if (NOT Eigen3_FOUND)
   message(WARNING "Eigen3 3.4.90+ not found; installing from source...")
@@ -31,49 +37,55 @@ endif ()
 
 # include(GenerateExportHeader)
 
-add_library(pls ${CMAKE_CURRENT_SOURCE_DIR}/src/pls.cpp)
-add_library(${CMAKE_PROJECT_NAME}::pls ALIAS pls)
+add_library(PLS ${CMAKE_CURRENT_SOURCE_DIR}/src/pls.cpp)
 
-set_target_properties(pls PROPERTIES
+set_target_properties(PLS PROPERTIES
                       VERSION ${${CMAKE_PROJECT_NAME}_VERSION}
                       SOVERSION ${${CMAKE_PROJECT_NAME}_VERSION_MAJOR})
 
 # generate_export_header(pls)
 
-target_compile_features(pls PUBLIC cxx_std_17)
+target_compile_features(PLS PUBLIC cxx_std_17)
 
 target_compile_definitions(
-  pls PUBLIC "$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:PLS_STATIC_DEFINE>"
+  PLS PUBLIC "$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:PLS_STATIC_DEFINE>"
 )
 
 target_include_directories(
-  pls PUBLIC
+  PLS PUBLIC
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>"
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-  "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+  "$<INSTALL_INTERFACE:include>"
 )
 
-target_link_libraries(pls PUBLIC Eigen3::Eigen)
+target_link_libraries(PLS PUBLIC Eigen3::Eigen)
 
-add_executable( PLS src/main.cpp )
-target_link_libraries( PLS pls )
+add_executable(PLS-bin src/main.cpp)
+target_link_libraries(PLS-bin PLS)
+set_target_properties(PLS-bin PROPERTIES OUTPUT_NAME PLS)
 
-install(TARGETS PLS pls
-  EXPORT plsTargets
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file(
+  "PLSConfigVersion.cmake"
+  VERSION ${PLS_VERSION}
+  COMPATIBILITY SameMajorVersion
+)
+install(FILES "PLSConfig.cmake" "${CMAKE_CURRENT_BINARY_DIR}/PLSConfigVersion.cmake"
+  DESTINATION lib/cmake/PLS
+)
+
+install(TARGETS PLS EXPORT PLSTargets
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
   INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
-# if (${CMAKE_INSTALL_INCLUDEDIR})
-#   message(STATUS "CMAKE_INSTALL_INCLUDEDIR: ${CMAKE_INSTALL_INCLUDEDIR}")
-#   install(FILES pls.h types.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
-# else()
-#   message(STATUS "CMAKE_INSTALL_INCLUDEDIR not defined")
-# endif()
+install(EXPORT PLSTargets
+  FILE PLSTargets.cmake
+  NAMESPACE PLS::
+  DESTINATION lib/cmake/PLS
+)
 
-install(EXPORT plsTargets
-        FILE plsTargets.cmake
-        NAMESPACE PLS::
-        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/pls
+install(TARGETS PLS-bin
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )

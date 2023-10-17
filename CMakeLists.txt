@@ -2,14 +2,6 @@ cmake_minimum_required( VERSION 3.16 )
 
 project(PLS VERSION 2.0.1 LANGUAGES CXX)
 
-#include(CMakePackageConfigHelpers)
-
-# configure_package_config_file(
-#   "${PROJECT_BINARY_DIR}/${PROJECT_NAME}Config.cmake"
-#   INSTALL_DESTINATION
-#   ${CMAKE_INSTALL_LIBDIR}/cmake/PLS-${PROJECT_VERSION}
-# )
-
 # TODO need to figure out the right way to ask for MPREAL_SUPPORT
 # would be propogated from parent project, presumably
 
@@ -35,15 +27,12 @@ if (DEFINED ${CMAKE_PROJECT_NAME}_SHARED_LIBS)
     set(BUILD_SHARED_LIBS "${${CMAKE_PROJECT_NAME}_SHARED_LIBS}")
 endif ()
 
-# include(GenerateExportHeader)
-
-add_library(PLS ${CMAKE_CURRENT_SOURCE_DIR}/src/pls.cpp)
+# our library target
+add_library(PLS)
 
 set_target_properties(PLS PROPERTIES
                       VERSION ${${CMAKE_PROJECT_NAME}_VERSION}
                       SOVERSION ${${CMAKE_PROJECT_NAME}_VERSION_MAJOR})
-
-# generate_export_header(pls)
 
 target_compile_features(PLS PUBLIC cxx_std_17)
 
@@ -57,6 +46,14 @@ target_include_directories(
   "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
   "$<INSTALL_INTERFACE:include>"
 )
+
+target_sources(PLS PRIVATE src/pls.cpp)
+# in 3.23:
+# target_sources(
+#   PLS PUBLIC FILE_SET HEADERS
+#   BASE_DIR "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" "$<INSTALL_INTERFACE:include>"
+#   FILES PLS/pls.h PLS/types.h
+# )
 
 target_link_libraries(PLS PUBLIC Eigen3::Eigen)
 
@@ -77,8 +74,14 @@ install(FILES "PLSConfig.cmake" "${CMAKE_CURRENT_BINARY_DIR}/PLSConfigVersion.cm
 install(TARGETS PLS EXPORT PLSTargets
   LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
   ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+  INCLUDES DESTINATION include
 )
+
+install(DIRECTORY include/PLS
+  DESTINATION include
+)
+# in 3.23:
+# install(TARGETS PLS FILE_SET HEADERS)
 
 install(EXPORT PLSTargets
   FILE PLSTargets.cmake

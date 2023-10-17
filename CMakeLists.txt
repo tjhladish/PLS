@@ -29,6 +29,8 @@ if (DEFINED ${CMAKE_PROJECT_NAME}_SHARED_LIBS)
     set(BUILD_SHARED_LIBS "${${CMAKE_PROJECT_NAME}_SHARED_LIBS}")
 endif ()
 
+# include(GenerateExportHeader)
+
 add_library(pls ${CMAKE_CURRENT_SOURCE_DIR}/src/pls.cpp)
 add_library(${CMAKE_PROJECT_NAME}::pls ALIAS pls)
 
@@ -36,14 +38,19 @@ set_target_properties(pls PROPERTIES
                       VERSION ${${CMAKE_PROJECT_NAME}_VERSION}
                       SOVERSION ${${CMAKE_PROJECT_NAME}_VERSION_MAJOR})
 
-target_include_directories(pls PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>")
+# generate_export_header(pls)
 
 target_compile_features(pls PUBLIC cxx_std_17)
 
 target_compile_definitions(
-    pls PUBLIC "$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:PLS_STATIC_DEFINE>")
+  pls PUBLIC "$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:PLS_STATIC_DEFINE>"
+)
+
 target_include_directories(
-    pls PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>")
+  pls PUBLIC
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+)
 
 target_link_libraries(pls PUBLIC Eigen3::Eigen)
 
@@ -51,7 +58,22 @@ add_executable( PLS src/main.cpp )
 target_link_libraries( PLS pls )
 
 install(TARGETS PLS pls
-  RUNTIME DESTINATION bin
-  LIBRARY DESTINATION lib
-  ARCHIVE DESTINATION lib
+  EXPORT plsTargets
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+# if (${CMAKE_INSTALL_INCLUDEDIR})
+#   message(STATUS "CMAKE_INSTALL_INCLUDEDIR: ${CMAKE_INSTALL_INCLUDEDIR}")
+#   install(FILES pls.h types.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+# else()
+#   message(STATUS "CMAKE_INSTALL_INCLUDEDIR not defined")
+# endif()
+
+install(EXPORT plsTargets
+        FILE plsTargets.cmake
+        NAMESPACE PLS::
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/pls
 )

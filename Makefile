@@ -5,8 +5,8 @@
 TESTING ?=
 
 install: build-static build-shared
-	cmake --install build-shared $(TESTING)
-	cmake --install build-static $(TESTING)
+	sudo cmake --install build-shared $(TESTING)
+	sudo cmake --install build-static $(TESTING)
 
 build: .FORCE
 	mkdir -p $@ && cd $@ && cmake ..

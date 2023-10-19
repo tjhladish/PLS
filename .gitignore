@@ -3,8 +3,10 @@ PLS
 libpls.a
 CMakeCache.txt
 CMakeFiles
-build-shared
-build-static
-_install
+build-shared/*
+build-static/*
+build-debug/*
+build/*
+_install/*
 .vscode
 cmake_install.cmake
